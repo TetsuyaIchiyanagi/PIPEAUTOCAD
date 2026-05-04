@@ -1,4 +1,4 @@
-(defun c:INSERTY45 (/ ss nodes item p dirs info blk ang count)
+(defun c:INSERTPIPEPARTS (/ ss nodes item p dirs info blk ang count)
 
   (setq ss (ssget '((0 . "LINE"))))
 
@@ -10,6 +10,8 @@
       (foreach item nodes
         (setq p (car item))
         (setq dirs (pa-get-node-dirs ss p 10.0))
+
+        ;; ここが重要：Y45だけでなく、エルボ・チーズ・45曲げも判定
         (setq info (pa-dirs-to-insert-info dirs))
 
         (if info
@@ -18,13 +20,12 @@
             (setq ang (cadr info))
 
             (pa-insert-block p blk ang)
-
             (setq count (1+ count))
           )
         )
       )
 
-      (princ (strcat "\n45°合流ブロック挿入数: " (itoa count)))
+      (princ (strcat "\n挿入数: " (itoa count)))
     )
     (princ "\nLINEを選択してください。")
   )

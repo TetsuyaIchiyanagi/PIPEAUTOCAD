@@ -222,20 +222,19 @@
 
   (cond
     ;; 水平主管
-    ((pa-same-dirs d '("L" "R" "LD")) (list "z01051017B" 90.0))
-    ((pa-same-dirs d '("L" "R" "RD")) (list "z01051017B" 180.0))
-    ((pa-same-dirs d '("L" "R" "RU")) (list "z01051017B" 270.0))
-    ((pa-same-dirs d '("L" "R" "LU")) (list "z01051017B" 0.0))
+    ((pa-same-dirs d '("L" "R" "LD")) (list "z01051017B" 270.0))
+    ((pa-same-dirs d '("L" "R" "RU")) (list "z01051017B" 90.0))
+    ((pa-same-dirs d '("L" "R" "RD")) (list "z01051010B" 90.0))
+    ((pa-same-dirs d '("L" "R" "LU")) (list "z01051010B" 270.0))
 
     ;; 縦主管
-    ((pa-same-dirs d '("U" "D" "LD")) (list "z01051010B" 90.0))
-    ((pa-same-dirs d '("U" "D" "RD")) (list "z01051010B" 180.0))
-    ((pa-same-dirs d '("U" "D" "RU")) (list "z01051010B" 270.0))
-    ((pa-same-dirs d '("U" "D" "LU")) (list "z01051010B" 0.0))
+    ((pa-same-dirs d '("U" "D" "RD")) (list "z01051017B" 0.0))
+    ((pa-same-dirs d '("U" "D" "LU")) (list "z01051017B" 180.0))
+    ((pa-same-dirs d '("U" "D" "RU")) (list "z01051010B" 180.0))
+    ((pa-same-dirs d '("U" "D" "LD")) (list "z01051010B" 0.0))
 
     (T nil)
   )
-
 )
 (defun pa-sort-dirs (dirs)
   (vl-sort dirs '<)
@@ -244,12 +243,57 @@
 (defun pa-same-dirs (a b)
   (equal (pa-sort-dirs a) (pa-sort-dirs b))
 )
-(defun pa-dirs-to-insert-info (dirs / y45)
+(defun pa-dirs-to-insert-info (dirs / y45 elbow tee bend45)
 
   (setq y45 (pa-dirs-to-y45 dirs))
+  (setq elbow (pa-dirs-to-elbow dirs))
+  (setq tee (pa-dirs-to-tee dirs))
+  (setq bend45 (pa-dirs-to-bend45 dirs))
 
-  (if y45
-    y45
-    nil
+  (cond
+    (y45 y45)
+    (elbow elbow)
+    (tee tee)
+    (bend45 bend45)
+    (T nil)
+  )
+)
+(defun pa-dirs-to-elbow (dirs / d)
+  (setq d (pa-sort-dirs dirs))
+
+  (cond
+    ((pa-same-dirs d '("R" "U")) (list "z01051006B" 270.0))
+    ((pa-same-dirs d '("L" "U")) (list "z01051006B" 0.0))
+    ((pa-same-dirs d '("L" "D")) (list "z01051006B" 90.0))
+    ((pa-same-dirs d '("R" "D")) (list "z01051006B" 180.0))
+    (T nil)
+  )
+)
+(defun pa-dirs-to-tee (dirs / d)
+  (setq d (pa-sort-dirs dirs))
+
+  (cond
+    ((pa-same-dirs d '("L" "R" "U")) (list "z01051007B" 0.0))
+    ((pa-same-dirs d '("U" "D" "R")) (list "z01051007B" 270.0))
+    ((pa-same-dirs d '("L" "R" "D")) (list "z01051007B" 180.0))
+    ((pa-same-dirs d '("U" "D" "L")) (list "z01051007B" 90.0))
+    (T nil)
+  )
+)
+(defun pa-dirs-to-bend45 (dirs / d)
+  (setq d (pa-sort-dirs dirs))
+
+  (cond
+    ((pa-same-dirs d '("R" "LU")) (list "z01051008B" 315.0))
+    ((pa-same-dirs d '("U" "LD")) (list "z01051008B" 45.0))
+    ((pa-same-dirs d '("L" "RD")) (list "z01051008B" 135.0))
+    ((pa-same-dirs d '("D" "RU")) (list "z01051008B" 225.0))
+
+    ((pa-same-dirs d '("R" "LD")) (list "z01051008B" 0.0))
+    ((pa-same-dirs d '("D" "LU")) (list "z01051008B" 90.0))
+    ((pa-same-dirs d '("L" "RU")) (list "z01051008B" 180.0))
+    ((pa-same-dirs d '("U" "RD")) (list "z01051008B" 270.0))
+
+    (T nil)
   )
 )
