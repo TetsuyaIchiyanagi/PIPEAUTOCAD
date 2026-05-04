@@ -13,6 +13,7 @@
         (cond
           ((= typ "BEND") (pa-draw-circle p))
           ((= typ "JOIN") (pa-draw-triangle p))
+          ((= typ "CROSS45") (pa-draw-square p))
         )
       )
 
@@ -72,7 +73,7 @@
   result
 )
 
-(defun pa-classify-by-endpoint (p a1 a2 b1 b2 tol / aEnd bEnd)
+(defun pa-classify-by-endpoint (p a1 a2 b1 b2 tol / aEnd bEnd ang)
 
   (setq aEnd
     (or
@@ -94,14 +95,17 @@
       "BEND"
     )
 
-    ;; •Ð•û‚Ü‚½‚Í—¼•û‚ªü‚Ì“r’†‚È‚ç‡—¬“_
+    ;; 45‹Œð·‚È‚ç 
+    ((pa-45-cross-p a1 a2 b1 b2)
+      "CROSS45"
+    )
+
+    ;; ‚»‚êˆÈŠO‚Í‡—¬“_
     (T
       "JOIN"
     )
   )
-)
-
-(defun pa-add-node (p typ result tol / found item oldTyp newTyp)
+)(defun pa-add-node (p typ result tol / found item oldTyp newTyp)
   (setq found nil)
   (setq newResult '())
 
@@ -128,5 +132,32 @@
   (if found
     newResult
     (cons (list p typ) result)
+  )
+)
+(defun pa-45-cross-p (a1 a2 b1 b2 / ang1 ang2 diff deg tolDeg)
+
+  ;; Šp“x‹–—eF}5‹
+  (setq tolDeg 5.0)
+
+  (setq ang1 (angle a1 a2))
+  (setq ang2 (angle b1 b2))
+
+  (setq diff (abs (- ang1 ang2)))
+
+  ;; 180‹‚ð’´‚¦‚é·‚Í•â³
+  (if (> diff pi)
+    (setq diff (- (* 2 pi) diff))
+  )
+
+  ;; ¬‚³‚¢•û‚ÌŒð·Šp‚É‚·‚é
+  (if (> diff (/ pi 2.0))
+    (setq diff (- pi diff))
+  )
+
+  (setq deg (* 180.0 (/ diff pi)))
+
+  (and
+    (>= deg (- 45.0 tolDeg))
+    (<= deg (+ 45.0 tolDeg))
   )
 )
