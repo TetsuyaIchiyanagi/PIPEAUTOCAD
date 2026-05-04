@@ -1,22 +1,46 @@
-(defun c:JUDGEPOINT (/ ss pts p dirs typ)
+(defun c:JUDGEPOINT (/ ss pts p dirs typ count)
 
   (setq ss (ssget '((0 . "LINE"))))
 
   (if ss
     (progn
       (setq pts (pa-get-intersections ss))
+      (setq count 0)
+
+      (princ (strcat "\nŒğ“_”: " (itoa (length pts))))
 
       (foreach p pts
         (setq dirs (pa-get-dirs ss p))
         (setq typ (pa-classify dirs))
 
+        (princ
+          (strcat
+            "\n“_: "
+            (rtos (car p) 2 2)
+            ","
+            (rtos (cadr p) 2 2)
+            " / dirs="
+            (vl-princ-to-string dirs)
+            " / typ="
+            (if typ typ "nil")
+          )
+        )
+
         (cond
-          ((= typ "BEND") (pa-draw-circle p))
-          ((= typ "JOIN") (pa-draw-triangle p))
+          ((= typ "BEND")
+            (pa-draw-circle p)
+            (setq count (1+ count))
+          )
+          ((= typ "JOIN")
+            (pa-draw-triangle p)
+            (setq count (1+ count))
+          )
         )
       )
+
+      (princ (strcat "\nì}”: " (itoa count)))
     )
-    (princ "\nLINEã‚’é¸æŠã—ã¦ãã ã•ã„ã€‚")
+    (princ "\nLINE‚ğ‘I‘ğ‚µ‚Ä‚­‚¾‚³‚¢B")
   )
 
   (princ)
@@ -32,7 +56,7 @@
     (setq p1 (cdr (assoc 10 (entget e))))
     (setq p2 (cdr (assoc 11 (entget e))))
 
-    ;; pãŒç·šä¸Šã«ã‚ã‚‹ã‹ãƒã‚§ãƒƒã‚¯
+    ;; p‚ªüã‚É‚ ‚é‚©ƒ`ƒFƒbƒN
     (if (pa-point-on-seg p p1 p2 tol)
       (progn
         (setq dirs (cons (pa-dir p p1) dirs))
