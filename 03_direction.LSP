@@ -172,3 +172,81 @@
 
   (princ)
 )
+(defun c:CHECKY45 (/ ss nodes item p dirs info txt)
+
+  (setq ss (ssget '((0 . "LINE"))))
+
+  (if ss
+    (progn
+      (setq nodes (pa-get-node-types ss))
+
+      (foreach item nodes
+        (setq p (car item))
+        (setq dirs (pa-get-node-dirs ss p 10.0))
+        (setq info (pa-dirs-to-y45 dirs))
+
+        (if info
+          (progn
+            (setq txt
+              (strcat
+                (car info)
+                " / "
+                (rtos (cadr info) 2 0)
+                "deg"
+              )
+            )
+
+            (entmakex
+              (list
+                '(0 . "TEXT")
+                (cons 10 (list (+ (car p) 150.0) (- (cadr p) 150.0) 0.0))
+                (cons 40 120.0)
+                (cons 1 txt)
+                '(50 . 0.0)
+              )
+            )
+          )
+        )
+      )
+
+      (princ "\n45度合流のブロック名と角度を表示しました。")
+    )
+    (princ "\nLINEを選択してください。")
+  )
+
+  (princ)
+)
+(defun pa-dirs-to-y45 (dirs / d)
+
+  (setq d (pa-sort-dirs dirs))
+
+  (cond
+    ((pa-same-dirs d '("L" "R" "LD")) (list "z01051010B" 0.0))
+    ((pa-same-dirs d '("L" "R" "RD")) (list "z01051010B" 90.0))
+    ((pa-same-dirs d '("L" "R" "RU")) (list "z01051010B" 180.0))
+    ((pa-same-dirs d '("L" "R" "LU")) (list "z01051010B" 270.0))
+
+    ((pa-same-dirs d '("U" "D" "LD")) (list "z01051017B" 0.0))
+    ((pa-same-dirs d '("U" "D" "RD")) (list "z01051017B" 90.0))
+    ((pa-same-dirs d '("U" "D" "RU")) (list "z01051017B" 180.0))
+    ((pa-same-dirs d '("U" "D" "LU")) (list "z01051017B" 270.0))
+
+    (T nil)
+  )
+)
+(defun pa-sort-dirs (dirs)
+  (vl-sort dirs '<)
+)
+
+(defun pa-same-dirs (a b)
+  (equal (pa-sort-dirs a) (pa-sort-dirs b))
+)
+(defun pa-dirs-to-insert-info (dirs / y45)
+
+  (setq y45 (pa-dirs-to-y45 dirs))
+
+  (if y45
+    y45
+    nil
+  )
+)
