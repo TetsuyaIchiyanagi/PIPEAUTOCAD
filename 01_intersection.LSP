@@ -1,7 +1,4 @@
-(defun get-intersections (ss / pts i j e1 e2 o1 o2 ip p tol)
-
-  (vl-load-com)
-  (setq tol 1.0)
+(defun pa-get-intersections (ss / pts i j e1 e2 o1 o2 ip p)
   (setq pts '())
   (setq i 0)
 
@@ -23,12 +20,9 @@
           (setq ip (cdddr ip))
         )
       )
-
       (setq j (1+ j))
     )
-
     (setq i (1+ i))
   )
-
   pts
 )

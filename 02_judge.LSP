@@ -4,25 +4,27 @@
 
   (if ss
     (progn
-      (setq pts (get-intersections ss))
+      (setq pts (pa-get-intersections ss))
 
       (foreach p pts
-        (setq dirs (get-dirs ss p))
-        (setq typ (classify-node dirs))
+        (setq dirs (pa-get-dirs ss p))
+        (setq typ (pa-classify dirs))
 
         (cond
-          ((= typ "BEND") (draw-circle p))
-          ((= typ "JOIN") (draw-triangle p))
+          ((= typ "BEND") (pa-draw-circle p))
+          ((= typ "JOIN") (pa-draw-triangle p))
         )
       )
     )
+    (princ "\nLINEを選択してください。")
   )
 
   (princ)
 )
 
-(defun get-dirs (ss p / dirs i e p1 p2)
+(defun pa-get-dirs (ss p / dirs i e p1 p2 tol)
   (setq dirs '())
+  (setq tol 1.0)
   (setq i 0)
 
   (while (< i (sslength ss))
@@ -30,12 +32,12 @@
     (setq p1 (cdr (assoc 10 (entget e))))
     (setq p2 (cdr (assoc 11 (entget e))))
 
-    (if (< (distance p p1) 1.0)
-      (setq dirs (cons (dir p p2) dirs))
-    )
-
-    (if (< (distance p p2) 1.0)
-      (setq dirs (cons (dir p p1) dirs))
+    ;; pが線上にあるかチェック
+    (if (pa-point-on-seg p p1 p2 tol)
+      (progn
+        (setq dirs (cons (pa-dir p p1) dirs))
+        (setq dirs (cons (pa-dir p p2) dirs))
+      )
     )
 
     (setq i (1+ i))
@@ -44,91 +46,67 @@
   dirs
 )
 
-(defun dir (p1 p2 / dx dy)
+(defun pa-dir (p1 p2 / dx dy)
   (setq dx (- (car p2) (car p1)))
   (setq dy (- (cadr p2) (cadr p1)))
 
   (cond
-    ((> dx 0) "R")
-    ((< dx 0) "L")
-    ((> dy 0) "U")
-    ((< dy 0) "D")
+    ((> dx 1e-6) "R")
+    ((< dx -1e-6) "L")
+    ((> dy 1e-6) "U")
+    ((< dy -1e-6) "D")
+    (T nil)
   )
 )
 
-(defun classify-node (dirs / n)
-  (setq n (length dirs))
+(defun pa-classify (dirs / u)
+  (setq u (pa-unique-list (vl-remove-if 'null dirs)))
 
   (cond
-    ((>= n 3) "JOIN")
-    ((= n 2)
-      (if (not (or (and (member "L" dirs) (member "R" dirs))
-                   (and (member "U" dirs) (member "D" dirs))))
-        "BEND"
+    ((>= (length u) 3) "JOIN")
+    ((and (= (length u) 2)
+          (not (or (and (member "L" u) (member "R" u))
+                   (and (member "U" u) (member "D" u)))))
+     "BEND")
+    (T nil)
+  )
+)
+
+(defun pa-unique-list (lst / result x)
+  (setq result '())
+
+  (foreach x lst
+    (if (not (member x result))
+      (setq result (cons x result))
+    )
+  )
+
+  result
+)(defun pa-point-on-seg (p a b tol / ab ap ratio q ab2)
+  (setq ab (mapcar '- b a))
+  (setq ap (mapcar '- p a))
+  (setq ab2 (apply '+ (mapcar '* ab ab)))
+
+  (if (= ab2 0.0)
+    nil
+    (progn
+      (setq ratio (/ (apply '+ (mapcar '* ap ab)) ab2))
+
+      (if (and (>= ratio 0.0) (<= ratio 1.0))
+        (progn
+          (setq q
+            (mapcar '+
+              a
+              (mapcar
+                '(lambda (x) (* x ratio))
+                ab
+              )
+            )
+          )
+          (< (distance p q) tol)
+        )
+        nil
       )
     )
   )
 )
-=======
-;;; 02_judge_bend_join.lsp
-;;;  ȓ_/     _ } [ J [ `  
-;;; -  ȓ_:  ~
-;;; -      _:  O p
-;;; - test
-
-(vl-load-com)
-
-(defun pbj:_to3d (pt /)
-  (if (= (length pt) 2)
-    (list (car pt) (cadr pt) 0.0)
-    pt
-  )
-)
-
-(defun pbj:_add-circle (pt radius / p3d)
-  (setq p3d (pbj:_to3d pt))
-  (entmakex
-    (list
-      '(0 . "CIRCLE")
-      '(100 . "AcDbEntity")
-      '(100 . "AcDbCircle")
-      (cons 10 p3d)
-      (cons 40 radius)
-    )
-  )
-)
-
-(defun pbj:_add-triangle (pt size / p3d h p1 p2 p3)
-  (setq p3d (pbj:_to3d pt))
-  (setq h (* size 0.866025403784)) ; sqrt(3)/2
-  (setq p1 (list (+ (car p3d) 0.0) (+ (cadr p3d) h) (caddr p3d)))
-  (setq p2 (list (- (car p3d) size) (- (cadr p3d) h) (caddr p3d)))
-  (setq p3 (list (+ (car p3d) size) (- (cadr p3d) h) (caddr p3d)))
-  (entmakex
-    (list
-      '(0 . "LWPOLYLINE")
-      '(100 . "AcDbEntity")
-      '(100 . "AcDbPolyline")
-      '(90 . 3)
-      '(70 . 1)
-      (cons 10 (list (car p1) (cadr p1)))
-      (cons 10 (list (car p2) (cadr p2)))
-      (cons 10 (list (car p3) (cadr p3)))
-    )
-  )
-)
-
-(defun pbj:place-point-marker (pt pointType markerSize /)
-  "pointType: 'bend  ܂    'join"
-  (cond
-    ((eq pointType 'bend)
-      (pbj:_add-circle pt markerSize)
-    )
-    ((eq pointType 'join)
-      (pbj:_add-triangle pt markerSize)
-    )
-  )
-)
-
-(princ)
->>>>>>> Stashed changes
