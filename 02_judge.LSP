@@ -1,4 +1,3 @@
-<<<<<<< Updated upstream
 (defun c:JUDGEPOINT (/ ss pts p dirs typ)
 
   (setq ss (ssget '((0 . "LINE"))))
@@ -72,9 +71,9 @@
 )
 =======
 ;;; 02_judge_bend_join.lsp
-;;; ‹È“_/‡—¬“_ƒ}[ƒJ[•`‰æ
-;;; - ‹È“_: ‰~
-;;; - ‡—¬“_: ŽOŠp
+;;;  È“_/     _ } [ J [ `  
+;;; -  È“_:  ~
+;;; -      _:  O p
 ;;; - test
 
 (vl-load-com)
@@ -120,7 +119,7 @@
 )
 
 (defun pbj:place-point-marker (pt pointType markerSize /)
-  "pointType: 'bend ‚Ü‚½‚Í 'join"
+  "pointType: 'bend  Ü‚    'join"
   (cond
     ((eq pointType 'bend)
       (pbj:_add-circle pt markerSize)
