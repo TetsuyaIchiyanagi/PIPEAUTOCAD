@@ -1,28 +1,25 @@
-(defun pa-get-intersections (ss / pts i j e1 e2 o1 o2 ip p)
-  (setq pts '())
+(defun pa-get-dirs (ss p / dirs i e p1 p2 tol)
+  (setq dirs '())
+  (setq tol 10.0) ;; ← 少し広めに
+
   (setq i 0)
-
   (while (< i (sslength ss))
-    (setq e1 (ssname ss i))
-    (setq o1 (vlax-ename->vla-object e1))
+    (setq e (ssname ss i))
+    (setq p1 (cdr (assoc 10 (entget e))))
+    (setq p2 (cdr (assoc 11 (entget e))))
 
-    (setq j (+ i 1))
-    (while (< j (sslength ss))
-      (setq e2 (ssname ss j))
-      (setq o2 (vlax-ename->vla-object e2))
-
-      (setq ip (vlax-invoke o1 'IntersectWith o2 acExtendNone))
-
-      (if ip
-        (while ip
-          (setq p (list (car ip) (cadr ip) (caddr ip)))
-          (setq pts (cons p pts))
-          (setq ip (cdddr ip))
-        )
-      )
-      (setq j (1+ j))
+    ;; p1が交点に近い
+    (if (< (distance p p1) tol)
+      (setq dirs (cons (pa-dir p p2) dirs))
     )
+
+    ;; p2が交点に近い
+    (if (< (distance p p2) tol)
+      (setq dirs (cons (pa-dir p p1) dirs))
+    )
+
     (setq i (1+ i))
   )
-  pts
+
+  dirs
 )
