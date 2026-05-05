@@ -1,4 +1,4 @@
-(vl-load-com)
+;; これがメイン
 
 (setq pa-path "C:/LISP/PipeAutoCAD/")
 
