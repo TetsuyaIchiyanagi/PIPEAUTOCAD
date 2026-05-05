@@ -17,9 +17,9 @@
         )
       )
 
-      (princ (strcat "\nì}”: " (itoa (length pts))))
+      (princ (strcat "\nä½œå›³æ•°: " (itoa (length pts))))
     )
-    (princ "\nLINE‚ð‘I‘ð‚µ‚Ä‚­‚¾‚³‚¢B")
+    (princ "\nLINEã‚’é¸æŠžã—ã¦ãã ã•ã„ã€‚")
   )
 
   (princ)
@@ -90,17 +90,17 @@
   )
 
   (cond
-    ;; —¼•û‚Ìü‚Ì’[“_“¯Žm‚È‚ç‹È“_
+    ;; ä¸¡æ–¹ã®ç·šã®ç«¯ç‚¹åŒå£«ãªã‚‰æ›²ç‚¹
     ((and aEnd bEnd)
       "BEND"
     )
 
-    ;; 45‹Œð·‚È‚ç 
+    ;; 45Â°äº¤å·®ãªã‚‰â–¡
     ((pa-45-cross-p a1 a2 b1 b2)
       "CROSS45"
     )
 
-    ;; ‚»‚êˆÈŠO‚Í‡—¬“_
+    ;; ãã‚Œä»¥å¤–ã¯åˆæµç‚¹
     (T
       "JOIN"
     )
@@ -115,7 +115,7 @@
         (setq found T)
         (setq oldTyp (cadr item))
 
-        ;; JOIN—Dæ
+        ;; JOINå„ªå…ˆ
         (setq newTyp
           (if (or (= oldTyp "JOIN") (= typ "JOIN"))
             "JOIN"
@@ -136,7 +136,7 @@
 )
 (defun pa-45-cross-p (a1 a2 b1 b2 / ang1 ang2 diff deg tolDeg)
 
-  ;; Šp“x‹–—eF}5‹
+  ;; è§’åº¦è¨±å®¹ï¼šÂ±5Â°
   (setq tolDeg 5.0)
 
   (setq ang1 (angle a1 a2))
@@ -144,12 +144,12 @@
 
   (setq diff (abs (- ang1 ang2)))
 
-  ;; 180‹‚ð’´‚¦‚é·‚Í•â³
+  ;; 180Â°ã‚’è¶…ãˆã‚‹å·®ã¯è£œæ­£
   (if (> diff pi)
     (setq diff (- (* 2 pi) diff))
   )
 
-  ;; ¬‚³‚¢•û‚ÌŒð·Šp‚É‚·‚é
+  ;; å°ã•ã„æ–¹ã®äº¤å·®è§’ã«ã™ã‚‹
   (if (> diff (/ pi 2.0))
     (setq diff (- pi diff))
   )
