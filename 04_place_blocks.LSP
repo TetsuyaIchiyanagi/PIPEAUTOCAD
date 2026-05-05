@@ -12,7 +12,7 @@
         (setq dirs (pa-get-node-dirs ss p 10.0))
 
         ;; ここが重要：Y45だけでなく、エルボ・チーズ・45曲げも判定
-        (setq info (pa-dirs-to-insert-info dirs))
+        (setq info (pa-dirs-to-insert-info dirs ss p))
 
         (if info
           (progn

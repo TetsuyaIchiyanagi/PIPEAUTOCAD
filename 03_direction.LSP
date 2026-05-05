@@ -243,10 +243,10 @@
 (defun pa-same-dirs (a b)
   (equal (pa-sort-dirs a) (pa-sort-dirs b))
 )
-(defun pa-dirs-to-insert-info (dirs / y45 elbow tee bend45)
+(defun pa-dirs-to-insert-info (dirs ss p / y45 elbow tee bend45)
 
   (setq y45 (pa-dirs-to-y45 dirs))
-  (setq elbow (pa-dirs-to-elbow dirs))
+  (setq elbow (pa-dirs-to-elbow dirs ss p))
   (setq tee (pa-dirs-to-tee dirs))
   (setq bend45 (pa-dirs-to-bend45 dirs))
 
@@ -258,15 +258,45 @@
     (T nil)
   )
 )
-(defun pa-dirs-to-elbow (dirs / d)
+(defun pa-dirs-to-elbow (dirs ss p / d minLen blk angleTable angle item)
+
   (setq d (pa-sort-dirs dirs))
 
-  (cond
-    ((pa-same-dirs d '("R" "U")) (list "z01051006B" 270.0))
-    ((pa-same-dirs d '("L" "U")) (list "z01051006B" 0.0))
-    ((pa-same-dirs d '("L" "D")) (list "z01051006B" 90.0))
-    ((pa-same-dirs d '("R" "D")) (list "z01051006B" 180.0))
-    (T nil)
+  ;; 長さ取得
+  (setq minLen (pa-get-min-length-at-node ss p 10.0))
+
+  ;; ブロック選定
+  (if (and minLen (> minLen 200.0))
+    (setq blk "z01051009B") ;; 長い
+    (setq blk "z01051006B") ;; 短い
+  )
+
+  (setq angleTable
+    (if (= blk "z01051009B")
+      (list
+        (list '("R" "U") 180.0)
+        (list '("L" "U") 270.0)
+        (list '("L" "D") 0.0)
+        (list '("R" "D") 90.0)
+      )
+      (list
+        (list '("R" "U") 270.0)
+        (list '("L" "U") 0.0)
+        (list '("L" "D") 90.0)
+        (list '("R" "D") 180.0)
+      )
+    )
+  )
+
+  (foreach item angleTable
+    (if (pa-same-dirs d (car item))
+      (setq angle (cadr item))
+    )
+  )
+
+  (if angle
+    (list blk angle)
+    nil
   )
 )
 (defun pa-dirs-to-tee (dirs / d)
@@ -296,4 +326,33 @@
 
     (T nil)
   )
+)
+(defun pa-get-min-length-at-node (ss p tol / i e p1 p2 len minLen)
+
+  (setq i 0)
+  (setq minLen nil)
+
+  (while (< i (sslength ss))
+    (setq e (ssname ss i))
+    (setq p1 (cdr (assoc 10 (entget e))))
+    (setq p2 (cdr (assoc 11 (entget e))))
+
+    ;; この交点に接続している線だけ対象
+    (if (or (< (distance p p1) tol)
+            (< (distance p p2) tol)
+            (pa-point-on-seg2 p p1 p2 tol)
+        )
+      (progn
+        (setq len (distance p1 p2))
+
+        (if (or (null minLen) (< len minLen))
+          (setq minLen len)
+        )
+      )
+    )
+
+    (setq i (1+ i))
+  )
+
+  minLen
 )
