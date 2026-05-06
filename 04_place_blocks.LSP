@@ -523,19 +523,25 @@
 
       (if lineSs
         (progn
-          (setq pa-debug-step "get flow point")
-          (princ "\n[DBG INSERTPIPEPARTS] asking flow point")
-          (setq flowPt (getpoint "\n流れ先の点を指定してください: "))
-
-          (if flowPt
+          (if (= systemType "D")
             (progn
-              (princ
-                (strcat
-                  "\n[DBG INSERTPIPEPARTS] flow point=("
-                  (rtos (car flowPt) 2 2)
-                  ","
-                  (rtos (cadr flowPt) 2 2)
-                  ")"
+              (setq pa-debug-step "get flow point")
+              (princ "\n[DBG INSERTPIPEPARTS] asking flow point")
+              (setq flowPt (getpoint "\n流れ先の点を指定してください: "))
+            )
+          )
+
+          (if (or (= systemType "W") flowPt)
+            (progn
+              (if flowPt
+                (princ
+                  (strcat
+                    "\n[DBG INSERTPIPEPARTS] flow point=("
+                    (rtos (car flowPt) 2 2)
+                    ","
+                    (rtos (cadr flowPt) 2 2)
+                    ")"
+                  )
                 )
               )
 

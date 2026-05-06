@@ -236,23 +236,20 @@
 
 (defun pa-dirs-to-insert-info-water (dirs ss p flowPt waterType / elbow tee bend45)
 
-  ;; waterType:
-  ;; "H" = 配管
-  ;; "P" = ポリエチレン管
-
   (cond
-    ((= waterType "P")
-      ;; 後でポリエチレン管専用ロジックへ
-      (setq elbow (pa-dirs-to-elbow dirs ss p))
-      (setq tee (pa-dirs-to-tee dirs ss p flowPt))
+    ;; 給水：配管 H
+    ((= waterType "H")
+      (setq elbow (pa-dirs-to-elbow-water-h dirs))
+      (setq tee (pa-dirs-to-tee-water-h dirs))
       (setq bend45 (pa-dirs-to-bend45 dirs))
     )
 
-    (T
-      ;; H: 配管
-      (setq elbow (pa-dirs-to-elbow dirs ss p))
-      (setq tee (pa-dirs-to-tee dirs ss p flowPt))
-      (setq bend45 (pa-dirs-to-bend45 dirs))
+    ;; 給水：ポリエチレン管 P
+    ;; まだ未実装なので一旦nil
+    ((= waterType "P")
+      (setq elbow nil)
+      (setq tee nil)
+      (setq bend45 nil)
     )
   )
 
@@ -260,6 +257,32 @@
     (elbow elbow)
     (tee tee)
     (bend45 bend45)
+    (T nil)
+  )
+)
+
+(defun pa-dirs-to-elbow-water-h (dirs / d)
+
+  (setq d (pa-sort-dirs dirs))
+
+  (cond
+    ((pa-same-dirs d '("R" "U")) (list "z01051006B" 270.0))
+    ((pa-same-dirs d '("L" "U")) (list "z01051006B" 0.0))
+    ((pa-same-dirs d '("L" "D")) (list "z01051006B" 90.0))
+    ((pa-same-dirs d '("R" "D")) (list "z01051006B" 180.0))
+    (T nil)
+  )
+)
+
+(defun pa-dirs-to-tee-water-h (dirs / d)
+
+  (setq d (pa-sort-dirs dirs))
+
+  (cond
+    ((pa-same-dirs d '("L" "R" "U")) (list "z01051007B" 0.0))
+    ((pa-same-dirs d '("U" "D" "R")) (list "z01051007B" 270.0))
+    ((pa-same-dirs d '("L" "R" "D")) (list "z01051007B" 180.0))
+    ((pa-same-dirs d '("U" "D" "L")) (list "z01051007B" 90.0))
     (T nil)
   )
 )
