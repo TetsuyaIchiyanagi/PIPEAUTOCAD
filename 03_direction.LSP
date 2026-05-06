@@ -233,6 +233,37 @@
     (T nil)
   )
 )
+
+(defun pa-dirs-to-insert-info-water (dirs ss p flowPt waterType / elbow tee bend45)
+
+  ;; waterType:
+  ;; "H" = 配管
+  ;; "P" = ポリエチレン管
+
+  (cond
+    ((= waterType "P")
+      ;; 後でポリエチレン管専用ロジックへ
+      (setq elbow (pa-dirs-to-elbow dirs ss p))
+      (setq tee (pa-dirs-to-tee dirs ss p flowPt))
+      (setq bend45 (pa-dirs-to-bend45 dirs))
+    )
+
+    (T
+      ;; H: 配管
+      (setq elbow (pa-dirs-to-elbow dirs ss p))
+      (setq tee (pa-dirs-to-tee dirs ss p flowPt))
+      (setq bend45 (pa-dirs-to-bend45 dirs))
+    )
+  )
+
+  (cond
+    (elbow elbow)
+    (tee tee)
+    (bend45 bend45)
+    (T nil)
+  )
+)
+
 (defun pa-dirs-to-elbow (dirs ss p / d minLen blk angleTable angle item)
 
   (setq d (pa-sort-dirs dirs))

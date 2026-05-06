@@ -447,7 +447,7 @@
   )
 )
 
-(defun c:INSERTPIPEPARTS (/ *error* olderr ss lineSs partSs nodes item p dirs info blk ang count flowPt)
+(defun c:INSERTPIPEPARTS (/ *error* olderr ss lineSs partSs nodes item p dirs info blk ang count flowPt systemType waterType)
 
   (setq olderr *error*)
   (setq pa-debug-step "command start")
@@ -466,6 +466,25 @@
   )
 
   (princ "\n[DBG INSERTPIPEPARTS] using debug command definition")
+
+  (initget "D W")
+  (setq systemType (getkword "\n処理種別を選択 [排水(D)/給水(W)] <D>: "))
+
+  (if (null systemType)
+    (setq systemType "D")
+  )
+
+  ;; 給水の場合だけ、さらに種別選択
+  (if (= systemType "W")
+    (progn
+      (initget "H P")
+      (setq waterType (getkword "\n給水種別を選択 [配管(H)/ポリエチレン管(P)] <H>: "))
+
+      (if (null waterType)
+        (setq waterType "H")
+      )
+    )
+  )
 
   (setq pa-debug-step "ssget LINE or target block")
   (setq ss
@@ -550,7 +569,16 @@
                 )
 
                 (setq pa-debug-step "dirs to insert info")
-                (setq info (pa-dirs-to-insert-info dirs lineSs p flowPt))
+                (setq info
+                  (cond
+                    ((= systemType "W")
+                      (pa-dirs-to-insert-info-water dirs lineSs p flowPt waterType)
+                    )
+                    (T
+                      (pa-dirs-to-insert-info dirs lineSs p flowPt)
+                    )
+                  )
+                )
                 (if info
                   (progn
                     (setq blk (car info))
