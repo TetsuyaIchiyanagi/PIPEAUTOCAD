@@ -1,30 +1,3 @@
-(defun c:JUDGEPOINT (/ ss pts item p typ)
-
-  (setq ss (ssget '((0 . "LINE"))))
-
-  (if ss
-    (progn
-      (setq pts (pa-get-node-types ss))
-
-      (foreach item pts
-        (setq p (car item))
-        (setq typ (cadr item))
-
-        (cond
-          ((= typ "BEND") (pa-draw-circle p))
-          ((= typ "JOIN") (pa-draw-triangle p))
-          ((= typ "CROSS45") (pa-draw-square p))
-        )
-      )
-
-      (princ (strcat "\n作図数: " (itoa (length pts))))
-    )
-    (princ "\nLINEを選択してください。")
-  )
-
-  (princ)
-)
-
 (defun pa-get-node-types (ss / result i j e1 e2 p1 p2 p3 p4 o1 o2 ip p typ tol)
   (setq result '())
   (setq tol 10.0)

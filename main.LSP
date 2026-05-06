@@ -9,6 +9,4 @@
 (load (strcat pa-path "05_pipe_size_text.lsp"))
 
 (princ "\nPipeAutoCAD loaded.")
-(princ "\nCommand: JUDGEPOINT")
-(princ "\nCommand: PIPESIZE")
 (princ "\nCommand: PIPESIZEAUTO")
