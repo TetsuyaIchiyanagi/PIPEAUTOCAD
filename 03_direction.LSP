@@ -243,11 +243,61 @@
 (defun pa-same-dirs (a b)
   (equal (pa-sort-dirs a) (pa-sort-dirs b))
 )
-(defun pa-dirs-to-insert-info (dirs ss p / y45 elbow tee bend45)
+
+(defun pa-dirs-to-01to16-angle (dirs / d)
+
+  (setq d (pa-sort-dirs dirs))
+
+  (cond
+
+    ;; 右
+    ((member "R" d) 0.0)
+
+    ;; 上
+    ((member "U" d) 90.0)
+
+    ;; 左
+    ((member "L" d) 180.0)
+
+    ;; 下
+    ((member "D" d) 270.0)
+
+    (T nil)
+  )
+)
+
+(defun pa-get-cut-dirs (blkName dirs / d)
+
+  (setq d (pa-sort-dirs dirs))
+
+  (cond
+
+    ;; 長尺エルボ
+    ((= blkName "z01051009B")
+      d
+    )
+
+    ;; 長尺チーズ
+    ((member blkName '("z01051018B" "z01051011B"))
+
+      (cond
+        ((pa-same-dirs d '("L" "R" "U")) '("U"))
+        ((pa-same-dirs d '("L" "R" "D")) '("D"))
+        ((pa-same-dirs d '("U" "D" "L")) '("L"))
+        ((pa-same-dirs d '("U" "D" "R")) '("R"))
+        (T nil)
+      )
+    )
+
+    (T nil)
+  )
+)
+
+(defun pa-dirs-to-insert-info (dirs ss p flowPt / y45 elbow tee bend45)
 
   (setq y45 (pa-dirs-to-y45 dirs))
   (setq elbow (pa-dirs-to-elbow dirs ss p))
-  (setq tee (pa-dirs-to-tee dirs))
+  (setq tee (pa-dirs-to-tee dirs ss p flowPt))
   (setq bend45 (pa-dirs-to-bend45 dirs))
 
   (cond
@@ -299,15 +349,58 @@
     nil
   )
 )
-(defun pa-dirs-to-tee (dirs / d)
-  (setq d (pa-sort-dirs dirs))
+(defun pa-dirs-to-tee (dirs ss p flowPt / d minLen blk ang branchDir flowDir)
 
-  (cond
-    ((pa-same-dirs d '("L" "R" "U")) (list "z01051007B" 0.0))
-    ((pa-same-dirs d '("U" "D" "R")) (list "z01051007B" 270.0))
-    ((pa-same-dirs d '("L" "R" "D")) (list "z01051007B" 180.0))
-    ((pa-same-dirs d '("U" "D" "L")) (list "z01051007B" 90.0))
-    (T nil)
+  (setq d (pa-sort-dirs dirs))
+  (setq minLen (pa-get-min-length-at-node ss p 10.0))
+
+  ;; 通常チーズ：最短長さ200以下
+  (if (or (null minLen) (<= minLen 200.0))
+    (setq blk "z01051007B")
+    (progn
+      ;; 長尺チーズ
+      (setq branchDir (pa-get-tee-branch-dir d))
+      (setq flowDir (pa-get-tee-flow-dir d p flowPt))
+      (setq blk (pa-get-long-tee-block flowDir branchDir))
+    )
+  )
+
+  (if (= blk "z01051007B")
+    ;; 通常チーズはチーズ形状で角度を決める
+    (cond
+      ((pa-same-dirs d '("L" "R" "U")) (setq ang 0.0))
+      ((pa-same-dirs d '("U" "D" "R")) (setq ang 270.0))
+      ((pa-same-dirs d '("L" "R" "D")) (setq ang 180.0))
+      ((pa-same-dirs d '("U" "D" "L")) (setq ang 90.0))
+      (T (setq ang nil))
+    )
+    ;; 長尺チーズはブロックタイプごとに基準向きが異なる
+    (cond
+      ((= blk "z01051011B")
+        (cond
+          ((= flowDir "R") (setq ang 270.0))
+          ((= flowDir "U") (setq ang 0.0))
+          ((= flowDir "L") (setq ang 90.0))
+          ((= flowDir "D") (setq ang 180.0))
+          (T (setq ang nil))
+        )
+      )
+      ((= blk "z01051018B")
+        (cond
+          ((= flowDir "R") (setq ang 270.0))
+          ((= flowDir "U") (setq ang 0.0))
+          ((= flowDir "L") (setq ang 90.0))
+          ((= flowDir "D") (setq ang 180.0))
+          (T (setq ang nil))
+        )
+      )
+      (T (setq ang nil))
+    )
+  )
+
+  (if (and blk ang)
+    (list blk ang)
+    nil
   )
 )
 (defun pa-dirs-to-bend45 (dirs / d)
@@ -355,4 +448,68 @@
   )
 
   minLen
+)
+
+(defun pa-get-tee-branch-dir (dirs)
+
+  (cond
+    ((and (member "L" dirs) (member "R" dirs) (member "U" dirs)) "U")
+    ((and (member "L" dirs) (member "R" dirs) (member "D" dirs)) "D")
+    ((and (member "U" dirs) (member "D" dirs) (member "L" dirs)) "L")
+    ((and (member "U" dirs) (member "D" dirs) (member "R" dirs)) "R")
+    (T nil)
+  )
+)
+(defun pa-get-flow-dir (p flowPt / dx dy)
+
+  (setq dx (- (car flowPt) (car p)))
+  (setq dy (- (cadr flowPt) (cadr p)))
+
+  (if (> (abs dx) (abs dy))
+    (if (> dx 0) "R" "L")
+    (if (> dy 0) "U" "D")
+  )
+)
+(defun pa-get-tee-flow-dir (dirs p flowPt / dx dy)
+
+  (setq dx (- (car flowPt) (car p)))
+  (setq dy (- (cadr flowPt) (cadr p)))
+
+  (cond
+    ;; 横主管
+    ((and (member "L" dirs) (member "R" dirs))
+      (if (> dx 0) "R" "L")
+    )
+
+    ;; 縦主管
+    ((and (member "U" dirs) (member "D" dirs))
+      (if (> dy 0) "U" "D")
+    )
+
+    (T
+      (pa-get-flow-dir p flowPt)
+    )
+  )
+)
+(defun pa-get-long-tee-block (flowDir branchDir)
+
+  (cond
+    ;; 流れ右
+    ((and (= flowDir "R") (= branchDir "U")) "z01051011B")
+    ((and (= flowDir "R") (= branchDir "D")) "z01051018B")
+
+    ;; 流れ左
+    ((and (= flowDir "L") (= branchDir "U")) "z01051018B")
+    ((and (= flowDir "L") (= branchDir "D")) "z01051011B")
+
+    ;; 流れ下
+    ((and (= flowDir "D") (= branchDir "R")) "z01051011B")
+    ((and (= flowDir "D") (= branchDir "L")) "z01051018B")
+
+    ;; 流れ上
+    ((and (= flowDir "U") (= branchDir "R")) "z01051018B")
+    ((and (= flowDir "U") (= branchDir "L")) "z01051011B")
+
+    (T "z01051007B")
+  )
 )
