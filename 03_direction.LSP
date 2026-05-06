@@ -243,6 +243,29 @@
 (defun pa-same-dirs (a b)
   (equal (pa-sort-dirs a) (pa-sort-dirs b))
 )
+
+(defun pa-dirs-to-01to16-angle (dirs / d)
+
+  (setq d (pa-sort-dirs dirs))
+
+  (cond
+
+    ;; 右
+    ((member "R" d) 0.0)
+
+    ;; 上
+    ((member "U" d) 90.0)
+
+    ;; 左
+    ((member "L" d) 180.0)
+
+    ;; 下
+    ((member "D" d) 270.0)
+
+    (T nil)
+  )
+)
+
 (defun pa-dirs-to-insert-info (dirs ss p flowPt / y45 elbow tee bend45)
 
   (setq y45 (pa-dirs-to-y45 dirs))
