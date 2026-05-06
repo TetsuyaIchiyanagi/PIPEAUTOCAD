@@ -113,7 +113,7 @@
 
         (if ang
           (progn
-            (pa-insert-block p "z01051016B" ang)
+            (pa-insert-block p "z01051016B" ang 100.0)
             (entdel e)
             (princ "\n[DBG 01to16] replaced")
           )
@@ -381,10 +381,13 @@
   )
 )
 
-(defun pa-insert-block (p blkName angleDeg / angleRad scale ent dirs cutDirs gap)
+(defun pa-insert-block (p blkName angleDeg dia / angleRad scale ent dirs cutDirs gap)
 
   (setq angleRad (* pi (/ angleDeg 180.0)))
-  (setq scale (pa-get-block-scale))
+  (if (or (null dia) (<= dia 0.0))
+    (setq dia 100.0)
+  )
+  (setq scale (* (pa-get-block-scale) (/ dia 100.0)))
   (setq dirs pa-current-insert-dirs)
   (setq cutDirs (pa-get-cut-dirs blkName dirs))
   (setq gap
@@ -650,7 +653,7 @@
                     (setq pa-current-insert-dirs dirs)
                     (if (= blk "__FILLET__")
                       (pa-fillet-lines-at-node lineSs p (getvar "LTSCALE"))
-                      (pa-insert-block p blk ang)
+                      (pa-insert-block p blk ang 100.0)
                     )
                     (setq pa-current-insert-dirs nil)
                     (setq count (1+ count))

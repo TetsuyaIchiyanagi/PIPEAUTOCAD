@@ -11,4 +11,7 @@
 
 (princ "\nPipeAutoCAD loaded.")
 (princ "\nCommand: PIPESIZEAUTO")
+(princ "\nCommand: CHECKPIPESEG")
+(princ "\nCommand: CHECKNODESIZE")
+(princ "\nCommand: INSERTPIPEPARTS_DIA_TEST")
 (princ "\nCommand: DOUBLEPIPE")
