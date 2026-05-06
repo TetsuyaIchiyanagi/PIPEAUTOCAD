@@ -245,11 +245,10 @@
     )
 
     ;; 給水：ポリエチレン管 P
-    ;; まだ未実装なので一旦nil
     ((= waterType "P")
-      (setq elbow nil)
-      (setq tee nil)
-      (setq bend45 nil)
+      (setq elbow (pa-dirs-to-elbow-water-p dirs))
+      (setq tee (pa-dirs-to-tee-water-h dirs))
+      (setq bend45 (pa-dirs-to-bend45 dirs))
     )
   )
 
@@ -283,6 +282,19 @@
     ((pa-same-dirs d '("U" "D" "R")) (list "z01051007B" 270.0))
     ((pa-same-dirs d '("L" "R" "D")) (list "z01051007B" 180.0))
     ((pa-same-dirs d '("U" "D" "L")) (list "z01051007B" 90.0))
+    (T nil)
+  )
+)
+
+(defun pa-dirs-to-elbow-water-p (dirs / d)
+
+  (setq d (pa-sort-dirs dirs))
+
+  (cond
+    ((pa-same-dirs d '("R" "U")) (list "__FILLET__" 0.0))
+    ((pa-same-dirs d '("L" "U")) (list "__FILLET__" 0.0))
+    ((pa-same-dirs d '("L" "D")) (list "__FILLET__" 0.0))
+    ((pa-same-dirs d '("R" "D")) (list "__FILLET__" 0.0))
     (T nil)
   )
 )

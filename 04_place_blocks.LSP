@@ -352,6 +352,35 @@
   )
 )
 
+(defun pa-fillet-lines-at-node (ss p rad / i e ed p1 p2 hitLines)
+
+  (setq hitLines '())
+  (setq i 0)
+
+  ;; pに接続するLINEを取得
+  (while (< i (sslength ss))
+    (setq e (ssname ss i))
+    (setq ed (entget e))
+    (setq p1 (cdr (assoc 10 ed)))
+    (setq p2 (cdr (assoc 11 ed)))
+
+    (if (or (< (distance p p1) 10.0)
+            (< (distance p p2) 10.0))
+      (setq hitLines (cons e hitLines))
+    )
+
+    (setq i (1+ i))
+  )
+
+  ;; 2本あればフィレット
+  (if (= (length hitLines) 2)
+    (progn
+      (setvar "FILLETRAD" rad)
+      (command "_.FILLET" (car hitLines) (cadr hitLines))
+    )
+  )
+)
+
 (defun pa-insert-block (p blkName angleDeg / angleRad scale ent dirs cutDirs gap)
 
   (setq angleRad (* pi (/ angleDeg 180.0)))
@@ -472,6 +501,7 @@
 
   (if (null systemType)
     (setq systemType "D")
+    (setq systemType (strcase systemType))
   )
 
   ;; 給水の場合だけ、さらに種別選択
@@ -482,7 +512,17 @@
 
       (if (null waterType)
         (setq waterType "H")
+        (setq waterType (strcase waterType))
       )
+    )
+  )
+
+  (princ
+    (strcat
+      "\n[DBG INSERTPIPEPARTS] system type: "
+      systemType
+      " water type: "
+      (if waterType waterType "-")
     )
   )
 
@@ -575,6 +615,14 @@
                 )
 
                 (setq pa-debug-step "dirs to insert info")
+                (princ
+                  (strcat
+                    "\n[DBG INSERTPIPEPARTS] dispatch systemType="
+                    systemType
+                    " waterType="
+                    (if waterType waterType "-")
+                  )
+                )
                 (setq info
                   (cond
                     ((= systemType "W")
@@ -600,7 +648,10 @@
 
                     (setq pa-debug-step "insert block")
                     (setq pa-current-insert-dirs dirs)
-                    (pa-insert-block p blk ang)
+                    (if (= blk "__FILLET__")
+                      (pa-fillet-lines-at-node lineSs p (getvar "LTSCALE"))
+                      (pa-insert-block p blk ang)
+                    )
                     (setq pa-current-insert-dirs nil)
                     (setq count (1+ count))
                   )
