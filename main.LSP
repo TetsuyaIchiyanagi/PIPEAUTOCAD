@@ -11,3 +11,4 @@
 (princ "\nPipeAutoCAD loaded.")
 (princ "\nCommand: JUDGEPOINT")
 (princ "\nCommand: PIPESIZE")
+(princ "\nCommand: PIPESIZEAUTO")
