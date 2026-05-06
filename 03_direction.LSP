@@ -266,6 +266,33 @@
   )
 )
 
+(defun pa-get-cut-dirs (blkName dirs / d)
+
+  (setq d (pa-sort-dirs dirs))
+
+  (cond
+
+    ;; 長尺エルボ
+    ((= blkName "z01051009B")
+      d
+    )
+
+    ;; 長尺チーズ
+    ((member blkName '("z01051018B" "z01051011B"))
+
+      (cond
+        ((pa-same-dirs d '("L" "R" "U")) '("U"))
+        ((pa-same-dirs d '("L" "R" "D")) '("D"))
+        ((pa-same-dirs d '("U" "D" "L")) '("L"))
+        ((pa-same-dirs d '("U" "D" "R")) '("R"))
+        (T nil)
+      )
+    )
+
+    (T nil)
+  )
+)
+
 (defun pa-dirs-to-insert-info (dirs ss p flowPt / y45 elbow tee bend45)
 
   (setq y45 (pa-dirs-to-y45 dirs))
