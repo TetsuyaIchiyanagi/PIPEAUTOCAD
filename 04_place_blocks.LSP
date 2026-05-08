@@ -285,7 +285,7 @@
 )
 
 (defun pa-queue-line-cut (p gap cutDirs)
-  (setq pa-line-cut-queue (cons (list p gap cutDirs) pa-line-cut-queue))
+  (setq pa-line-cut-queue (cons (list p gap cutDirs pa-active-line-ss) pa-line-cut-queue))
 )
 
 (defun pa-apply-deferred-line-cuts (/ item)
@@ -297,7 +297,7 @@
   )
 
   (foreach item (reverse pa-line-cut-queue)
-    (pa-cut-lines-around-point (car item) (cadr item) (caddr item))
+    (pa-cut-lines-around-point (car item) (cadr item) (caddr item) (nth 3 item))
   )
 
   (setq pa-line-cut-queue '())
@@ -348,13 +348,16 @@
   )
 )
 
-(defun pa-cut-lines-around-point (p gap cutDirs / ss i e ed p1 p2 q dir1 dir2 cutSide1 cutSide2 cut1 cut2 tol)
+(defun pa-cut-lines-around-point (p gap cutDirs targetSs / ss i e ed p1 p2 q dir1 dir2 cutSide1 cutSide2 cut1 cut2 tol)
 
   (setq tol 25.0)
 
   (if cutDirs
     (progn
-      (setq ss (ssget "_X" '((0 . "LINE"))))
+      (setq ss targetSs)
+      (if (null ss)
+        (setq ss (ssget "_X" '((0 . "LINE"))))
+      )
 
       (if ss
         (progn
@@ -525,7 +528,7 @@
       (if cutDirs
         (if pa-defer-line-cuts
           (pa-queue-line-cut p gap cutDirs)
-          (pa-cut-lines-around-point p gap cutDirs)
+          (pa-cut-lines-around-point p gap cutDirs nil)
         )
       )
 
@@ -758,6 +761,7 @@
               (princ (strcat "\n[DBG INSERTPIPEPARTS] nodes: " (itoa (length nodes))))
               (setq pa-defer-line-cuts T)
               (setq pa-line-cut-queue '())
+              (setq pa-active-line-ss lineSs)
 
               (foreach item nodes
                 (setq pa-debug-step "process node")
@@ -837,6 +841,7 @@
               (setq pa-debug-step "apply deferred line cuts")
               (setq pa-defer-line-cuts nil)
               (pa-apply-deferred-line-cuts)
+              (setq pa-active-line-ss nil)
               )
             )
 
