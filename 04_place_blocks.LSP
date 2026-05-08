@@ -43,7 +43,35 @@
   )
 )
 
-(defun pa-replace-01-to-16 (targetSs / ss lineSs i e ed p dirs ang)
+(defun pa-rad-to-deg (ang)
+  (* 180.0 (/ ang pi))
+)
+
+(defun pa-normalize-angle-deg (ang)
+  (while (< ang 0.0)
+    (setq ang (+ ang 360.0))
+  )
+
+  (while (>= ang 360.0)
+    (setq ang (- ang 360.0))
+  )
+
+  ang
+)
+
+(defun pa-01to16-angle-from-block (ed / oldName angleRad)
+  (setq oldName (strcase (cdr (assoc 2 ed))))
+  (setq angleRad (cdr (assoc 50 ed)))
+
+  (if (and angleRad
+           (wcmatch oldName "Z01051001B,Z02021001B")
+      )
+    (pa-normalize-angle-deg (pa-rad-to-deg angleRad))
+    nil
+  )
+)
+
+(defun pa-replace-01-to-16 (targetSs sourceLineSs / ss lineSs allLineSs i e ed p dirs ang)
 
   (princ "\n[DBG 01to16] start")
 
@@ -55,8 +83,12 @@
     (princ "\n[DBG 01to16] selected target blocks: 0")
   )
 
-  ;; Get all lines used for direction detection.
-  (setq lineSs (ssget "_X" '((0 . "LINE"))))
+  ;; Use the selected center lines for direction detection.
+  (setq lineSs sourceLineSs)
+  (if (null lineSs)
+    (setq lineSs (ssget "_X" '((0 . "LINE"))))
+  )
+  (setq allLineSs (ssget "_X" '((0 . "LINE"))))
 
   (if lineSs
     (princ (strcat "\n[DBG 01to16] lines: " (itoa (sslength lineSs))))
@@ -77,6 +109,7 @@
         (setq e (ssname ss i))
         (setq ed (entget e))
         (setq p (cdr (assoc 10 ed)))
+        (setq ang nil)
 
         (princ
           (strcat
@@ -93,6 +126,13 @@
         (if lineSs
           (setq dirs (pa-get-nearest-line-end-dir lineSs p))
           (setq dirs nil)
+        )
+
+        (if (and (null dirs) allLineSs)
+          (progn
+            (princ "\n[DBG 01to16] retry dirs with current drawing lines")
+            (setq dirs (pa-get-nearest-line-end-dir allLineSs p))
+          )
         )
 
         (princ
@@ -128,44 +168,88 @@
   (princ "\n[DBG 01to16] end")
 )
 
-(defun pa-get-nearest-line-end-dir (lineSs p / i e p1 p2 d1 d2 minDist nearestPt dir)
+(defun pa-cardinal-dir-p (dir)
+  (member dir '("R" "U" "L" "D"))
+)
+
+(defun pa-01to16-endpoint-candidate-score (dist dir lineDir / score)
+  (setq score dist)
+
+  (if (not (pa-cardinal-dir-p dir))
+    (setq score (+ score 100000.0))
+  )
+
+  (if (not (= dir lineDir))
+    (setq score (+ score 10000.0))
+  )
+
+  score
+)
+
+(defun pa-01to16-consider-endpoint (p ep other best / dir lineDir dist score bestScore)
+  (setq dir (pa-dir8 p ep))
+  (setq lineDir (pa-dir8 ep other))
+  (setq dist (distance p ep))
+  (setq score (pa-01to16-endpoint-candidate-score dist dir lineDir))
+
+  (princ
+    (strcat
+      "\n[DBG 01to16] candidate dir="
+      (if dir dir "nil")
+      " lineDir="
+      (if lineDir lineDir "nil")
+      " dist="
+      (rtos dist 2 2)
+      " score="
+      (rtos score 2 2)
+    )
+  )
+
+  (setq bestScore (if best (cadr best) nil))
+
+  (if (or (null bestScore) (< score bestScore))
+    (list dir score ep dist lineDir)
+    best
+  )
+)
+
+(defun pa-get-nearest-line-end-dir (lineSs p / i e ed p1 p2 best dir score nearestPt minDist lineDir)
 
   (setq i 0)
-  (setq minDist nil)
-  (setq nearestPt nil)
+  (setq best nil)
 
   (while (< i (sslength lineSs))
     (setq e (ssname lineSs i))
-    (setq p1 (cdr (assoc 10 (entget e))))
-    (setq p2 (cdr (assoc 11 (entget e))))
+    (setq ed (entget e))
 
-    (setq d1 (distance p p1))
-    (setq d2 (distance p p2))
-
-    (if (or (null minDist) (< d1 minDist))
+    (if ed
       (progn
-        (setq minDist d1)
-        (setq nearestPt p1)
-      )
-    )
+        (setq p1 (cdr (assoc 10 ed)))
+        (setq p2 (cdr (assoc 11 ed)))
 
-    (if (< d2 minDist)
-      (progn
-        (setq minDist d2)
-        (setq nearestPt p2)
+        (if (and p1 p2)
+          (progn
+            (setq best (pa-01to16-consider-endpoint p p1 p2 best))
+            (setq best (pa-01to16-consider-endpoint p p2 p1 best))
+          )
+        )
       )
     )
 
     (setq i (1+ i))
   )
 
-  (if nearestPt
+  (if best
     (progn
-      (setq dir (pa-dir8 p nearestPt))
+      (setq dir (car best))
+      (setq score (cadr best))
+      (setq nearestPt (caddr best))
+      (setq minDist (cadddr best))
+      (setq lineDir (nth 4 best))
 
       (princ
         (strcat
-          "\n[DBG 01to16] nearest endpoint=("
+          "\n[DBG 01to16] selected endpoint=("
           (rtos (car nearestPt) 2 2)
           ","
           (rtos (cadr nearestPt) 2 2)
@@ -173,10 +257,14 @@
           (rtos minDist 2 2)
           " dir="
           (if dir dir "nil")
+          " lineDir="
+          (if lineDir lineDir "nil")
+          " score="
+          (rtos score 2 2)
         )
       )
 
-      (if dir
+      (if (pa-cardinal-dir-p dir)
         (list dir)
         nil
       )
@@ -352,6 +440,27 @@
   )
 )
 
+(defun pa-filter-inserts (ss / result i e)
+
+  (setq result (ssadd))
+  (setq i 0)
+
+  (while (< i (sslength ss))
+    (setq e (ssname ss i))
+
+    (if (= (cdr (assoc 0 (entget e))) "INSERT")
+      (ssadd e result)
+    )
+
+    (setq i (1+ i))
+  )
+
+  (if (> (sslength result) 0)
+    result
+    nil
+  )
+)
+
 (defun pa-fillet-lines-at-node (ss p rad / i e ed p1 p2 hitLines)
 
   (setq hitLines '())
@@ -479,7 +588,7 @@
   )
 )
 
-(defun c:INSERTPIPEPARTS (/ *error* olderr ss lineSs partSs nodes item p dirs info blk ang count flowPt systemType waterType)
+(defun c:INSERTPIPEPARTS (/ *error* olderr ss lineSs textSs partSs nodes item p dirs info blk ang count flowPt systemType waterType drainLineMode)
 
   (setq olderr *error*)
   (setq pa-debug-step "command start")
@@ -520,26 +629,60 @@
     )
   )
 
+  (if (= systemType "D")
+    (progn
+      (initget "S D")
+      (setq drainLineMode (getkword "\nDrain mode [Single S/Double D] <S>: "))
+
+      (if (null drainLineMode)
+        (setq drainLineMode "S")
+        (setq drainLineMode (strcase drainLineMode))
+      )
+    )
+  )
+
   (princ
     (strcat
       "\n[DBG INSERTPIPEPARTS] system type: "
       systemType
       " water type: "
       (if waterType waterType "-")
+      " drain mode: "
+      (if drainLineMode drainLineMode "-")
     )
   )
 
-  (setq pa-debug-step "ssget LINE or target block")
-  (setq ss
-    (ssget
-      '(
-        (-4 . "<OR")
-          (0 . "LINE")
-          (-4 . "<AND")
-            (0 . "INSERT")
-            (2 . "z01051001B,z02021001B")
-          (-4 . "AND>")
-        (-4 . "OR>")
+  (if (and (= systemType "D") (= drainLineMode "D"))
+    (princ "\n[DBG INSERTPIPEPARTS] double-line drain mode selected")
+  )
+
+  (setq pa-debug-step "ssget targets")
+  (if (and (= systemType "D") (= drainLineMode "D"))
+    (progn
+      (princ "\n[DBG INSERTPIPEPARTS] select LINE, pipe-size TEXT, and blocks for double-line conversion")
+      (setq ss
+        (ssget
+          '(
+            (-4 . "<OR")
+              (0 . "LINE")
+              (0 . "TEXT,MTEXT")
+              (0 . "INSERT")
+            (-4 . "OR>")
+          )
+        )
+      )
+    )
+    (setq ss
+      (ssget
+        '(
+          (-4 . "<OR")
+            (0 . "LINE")
+            (-4 . "<AND")
+              (0 . "INSERT")
+              (2 . "z01051001B,z02021001B")
+            (-4 . "AND>")
+          (-4 . "OR>")
+        )
       )
     )
   )
@@ -555,8 +698,19 @@
         (princ "\n[DBG INSERTPIPEPARTS] selected lines: 0")
       )
 
+      (setq textSs (pa-filter-texts ss))
+      (if (and (= systemType "D") (= drainLineMode "D"))
+        (if textSs
+          (princ (strcat "\n[DBG INSERTPIPEPARTS] selected pipe-size texts: " (itoa (sslength textSs))))
+          (princ "\n[DBG INSERTPIPEPARTS] selected pipe-size texts: 0")
+        )
+      )
+
       (setq pa-debug-step "filter selected target blocks")
-      (setq partSs (pa-filter-blocks-by-name ss "z01051001B,z02021001B"))
+      (if (and (= systemType "D") (= drainLineMode "D"))
+        (setq partSs (pa-filter-inserts ss))
+        (setq partSs (pa-filter-blocks-by-name ss "z01051001B,z02021001B"))
+      )
       (if partSs
         (princ (strcat "\n[DBG INSERTPIPEPARTS] selected target blocks: " (itoa (sslength partSs))))
         (princ "\n[DBG INSERTPIPEPARTS] selected target blocks: 0")
@@ -566,7 +720,7 @@
 
       (if lineSs
         (progn
-          (if (= systemType "D")
+          (if (and (= systemType "D") (not (= drainLineMode "D")))
             (progn
               (setq pa-debug-step "get flow point")
               (princ "\n[DBG INSERTPIPEPARTS] asking flow point")
@@ -574,8 +728,19 @@
             )
           )
 
-          (if (or (= systemType "W") flowPt)
-            (progn
+          (cond
+            ((and (= systemType "D") (= drainLineMode "D"))
+              (if textSs
+                (progn
+                  (setq pa-debug-step "convert double pipe")
+                  (pa-convert-double-pipe-run lineSs textSs partSs)
+                )
+                (princ "\n[DBG INSERTPIPEPARTS] double-line drain mode requires pipe-size TEXT")
+              )
+            )
+
+            ((or (= systemType "W") flowPt)
+              (progn
               (if flowPt
                 (princ
                   (strcat
@@ -662,18 +827,26 @@
                 )
               )
 
+              (if (not (and (= systemType "D") (= drainLineMode "D")))
+                (progn
+                  (setq pa-debug-step "replace selected blocks before line cuts")
+                  (pa-replace-01-to-16 partSs lineSs)
+                )
+              )
+
               (setq pa-debug-step "apply deferred line cuts")
               (setq pa-defer-line-cuts nil)
               (pa-apply-deferred-line-cuts)
+              )
             )
-            (princ "\n[DBG INSERTPIPEPARTS] flow point is nil; skip LINE insert")
+
+            (T
+              (princ "\n[DBG INSERTPIPEPARTS] flow point is nil; skip LINE insert")
+            )
           )
         )
         (princ "\n[DBG INSERTPIPEPARTS] no selected LINE; skip flow point")
       )
-
-      (setq pa-debug-step "replace selected blocks")
-      (pa-replace-01-to-16 partSs)
 
       (princ (strcat "\n挿入数: " (itoa count)))
     )

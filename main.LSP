@@ -8,10 +8,11 @@
 (load (strcat pa-path "04_place_blocks.lsp"))
 (load (strcat pa-path "05_pipe_size_text.lsp"))
 (load (strcat pa-path "06_double_line.lsp"))
+(load (strcat pa-path "07_duct_double_line.lsp"))
 
 (princ "\nPipeAutoCAD loaded.")
 (princ "\nCommand: PIPESIZEAUTO")
+(princ "\nCommand: INSERTPIPEPARTS")
 (princ "\nCommand: CHECKPIPESEG")
 (princ "\nCommand: CHECKNODESIZE")
-(princ "\nCommand: INSERTPIPEPARTS_DIA_TEST")
-(princ "\nCommand: DOUBLEPIPE")
+(princ "\nCommand: DUCTDOUBLE")

@@ -1,11 +1,11 @@
 ;; PipeAutoCAD 06: double-line conversion
 ;;
-;; Planned command: DOUBLEPIPE
+;; Double-line conversion is launched from INSERTPIPEPARTS.
 ;;
 ;; Flow:
 ;; 1. PIPESIZEAUTO places pipe-size TEXT.
 ;; 2. User edits the pipe-size TEXT.
-;; 3. DOUBLEPIPE reads LINE and pipe-size TEXT.
+;; 3. INSERTPIPEPARTS reads LINE and pipe-size TEXT in double-line mode.
 ;; 4. Determine the pipe size for each segment.
 ;; 5. Convert single LINEs to double lines based on pipe diameter.
 ;; 6. Replace existing part blocks with size-scaled blocks.
@@ -46,7 +46,7 @@
 )
 
 (defun pa-double-pipe-break-block-names ()
-  "z00010002B,z01051011B,z01051009B,z01051018B,z02021009B,z02021011B,z02021015B"
+  "z00010002B,z01051016B,z01051006B,z01051009B,z01051007B,z01051008B,z01051010B,z01051017B,z01051011B,z01051018B,z02021001B,z02021013B,z02021006B,z02021009B,z02021007B,z02021008B,z02021010B,z02021014B,z02021011B,z02021015B,z02101001B,z02102002B,z02102001B,z02103001B,z02104001B,z02105001B,z02105002B,z02106001B,z02106002B"
 )
 
 (defun pa-double-pipe-block-node-tol (/ scale)
@@ -54,14 +54,36 @@
   (max 100.0 (* scale 1.5))
 )
 
-(defun pa-double-pipe-add-block-node (p handle result /)
+(defun pa-double-pipe-block-node-extents (p mn mx / u d l r)
+  (if (and p mn mx)
+    (progn
+      (setq u (max 0.0 (- (cadr mx) (cadr p))))
+      (setq d (max 0.0 (- (cadr p) (cadr mn))))
+      (setq l (max 0.0 (- (car p) (car mn))))
+      (setq r (max 0.0 (- (car mx) (car p))))
+      (list u d l r)
+    )
+    nil
+  )
+)
+
+(defun pa-double-pipe-add-block-node (p handle blockName bboxInfo result / mn mx extents)
   (if p
-    (cons (list p "BLOCK" handle) result)
+    (progn
+      (if bboxInfo
+        (progn
+          (setq mn (cadr bboxInfo))
+          (setq mx (caddr bboxInfo))
+          (setq extents (pa-double-pipe-block-node-extents p mn mx))
+        )
+      )
+      (cons (list p "BLOCK" handle extents blockName) result)
+    )
     result
   )
 )
 
-(defun pa-double-pipe-block-bbox-center (e / obj minPt maxPt err mn mx)
+(defun pa-double-pipe-block-bbox-info (e / obj minPt maxPt err mn mx center)
   (setq obj (vlax-ename->vla-object e))
   (setq err (vl-catch-all-apply 'vla-getboundingbox (list obj 'minPt 'maxPt)))
 
@@ -70,16 +92,32 @@
     (progn
       (setq mn (vlax-safearray->list minPt))
       (setq mx (vlax-safearray->list maxPt))
+      (setq center
+        (list
+          (/ (+ (car mn) (car mx)) 2.0)
+          (/ (+ (cadr mn) (cadr mx)) 2.0)
+          (/ (+ (caddr mn) (caddr mx)) 2.0)
+        )
+      )
       (list
-        (/ (+ (car mn) (car mx)) 2.0)
-        (/ (+ (cadr mn) (cadr mx)) 2.0)
-        (/ (+ (caddr mn) (caddr mx)) 2.0)
+        center
+        mn
+        mx
       )
     )
   )
 )
 
-(defun pa-get-double-pipe-block-nodes (/ ss i e ed p center handle result)
+(defun pa-double-pipe-block-bbox-center (e / info)
+  (setq info (pa-double-pipe-block-bbox-info e))
+
+  (if info
+    (car info)
+    nil
+  )
+)
+
+(defun pa-get-double-pipe-block-nodes (/ ss i e ed p bboxInfo center handle blockName result)
   (setq result '())
   (setq ss
     (ssget
@@ -100,11 +138,16 @@
         (setq ed (entget e))
         (setq p (cdr (assoc 10 ed)))
         (setq handle (cdr (assoc 5 ed)))
-        (setq center (pa-double-pipe-block-bbox-center e))
+        (setq blockName (cdr (assoc 2 ed)))
+        (setq bboxInfo (pa-double-pipe-block-bbox-info e))
+        (if bboxInfo
+          (setq center (car bboxInfo))
+          (setq center nil)
+        )
 
-        (setq result (pa-double-pipe-add-block-node p handle result))
+        (setq result (pa-double-pipe-add-block-node p handle blockName bboxInfo result))
         (if (and center (or (null p) (not (pa-same-point-p p center 1.0))))
-          (setq result (pa-double-pipe-add-block-node center handle result))
+          (setq result (pa-double-pipe-add-block-node center handle blockName bboxInfo result))
         )
 
         (setq i (1+ i))
@@ -113,6 +156,24 @@
   )
 
   result
+)
+
+(defun pa-obsolete-double-pipe-block-bbox-center (e / obj minPt maxPt err mn mx)
+  (setq obj (vlax-ename->vla-object e))
+  (setq err (vl-catch-all-apply 'vla-getboundingbox (list obj 'minPt 'maxPt)))
+
+  (if (vl-catch-all-error-p err)
+    nil
+    (progn
+      (setq mn (vlax-safearray->list minPt))
+      (setq mx (vlax-safearray->list maxPt))
+      (list
+        (/ (+ (car mn) (car mx)) 2.0)
+        (/ (+ (cadr mn) (cadr mx)) 2.0)
+        (/ (+ (caddr mn) (caddr mx)) 2.0)
+      )
+    )
+  )
 )
 
 (defun pa-double-pipe-block-node-on-line (nodePt p1 p2 / q ratio tol d)
@@ -435,7 +496,128 @@
   result
 )
 
-(defun c:INSERTPIPEPARTS_DIA_TEST (/ ss lineSs textSs flowPt segments nodeDiaList item p dirs info blk ang dia count)
+(defun pa-insert-pipeparts-dia-run (lineSs textSs flowPt logPrefix / segments nodeDiaList insertNodes item p dirs info blk ang dia count)
+  (setq segments (pa-build-pipe-segments lineSs textSs))
+  (setq nodeDiaList (pa-build-node-sizes segments))
+  (setq insertNodes (pa-get-node-types lineSs))
+  (setq count 0)
+
+  (princ
+    (strcat
+      "\n"
+      logPrefix
+      " segment count: "
+      (itoa (length segments))
+    )
+  )
+
+  (princ
+    (strcat
+      "\n"
+      logPrefix
+      " node dia count: "
+      (itoa (length nodeDiaList))
+    )
+  )
+
+  (foreach item nodeDiaList
+    (setq p (car item))
+    (setq dia (cadr item))
+    (setq dirs (pa-get-node-dirs lineSs p 10.0))
+
+    (princ
+      (strcat
+        "\n"
+        logPrefix
+        " node dia="
+        (pa-format-dia dia)
+        " dirs="
+        (if dirs (pa-dirs-to-string dirs) "nil")
+      )
+    )
+  )
+
+  (if flowPt
+    (progn
+      (princ
+        (strcat
+          "\n"
+          logPrefix
+          " insert node count: "
+          (itoa (length insertNodes))
+        )
+      )
+
+      (setq pa-defer-line-cuts T)
+      (setq pa-line-cut-queue '())
+
+      (foreach item insertNodes
+        (setq p (car item))
+        (setq dia (pa-get-node-max-dia p nodeDiaList))
+        (setq dirs (pa-get-node-dirs lineSs p 10.0))
+        (setq info (pa-dirs-to-insert-info dirs lineSs p flowPt))
+
+        (if info
+          (progn
+            (setq blk (car info))
+            (setq ang (cadr info))
+
+            (princ
+              (strcat
+                "\n"
+                logPrefix
+                " insert "
+                blk
+                " dia="
+                (pa-format-dia dia)
+                " angle="
+                (rtos ang 2 0)
+              )
+            )
+
+            (setq pa-current-insert-dirs dirs)
+            (if (= blk "__FILLET__")
+              (pa-fillet-lines-at-node lineSs p (* (getvar "LTSCALE") (/ dia 100.0)))
+              (pa-insert-block p blk ang dia)
+            )
+            (setq pa-current-insert-dirs nil)
+            (setq count (1+ count))
+          )
+          (princ
+            (strcat
+              "\n"
+              logPrefix
+              " insert info: nil"
+            )
+          )
+        )
+      )
+
+      (setq pa-defer-line-cuts nil)
+      (pa-apply-deferred-line-cuts)
+
+      (princ
+        (strcat
+          "\n"
+          logPrefix
+          " inserted count: "
+          (itoa count)
+        )
+      )
+    )
+    (princ
+      (strcat
+        "\n"
+        logPrefix
+        " flow point is nil; dia check only"
+      )
+    )
+  )
+
+  count
+)
+
+(defun pa-obsolete-insertpipeparts-dia-test (/ ss lineSs textSs flowPt segments nodeDiaList item p dirs info blk ang dia count)
   (princ "\n[DBG INSERTPIPEPARTS_DIA_TEST] start")
   (princ "\nSelect LINE and pipe-size TEXT: ")
 
@@ -721,7 +903,389 @@
   )
 )
 
-(defun c:DOUBLEPIPE (/ ss lineSs textSs segs seg p1 p2 size lineLayer dia offset count skipped)
+(defun pa-delete-line-ss (lineSs / i e)
+  (if lineSs
+    (progn
+      (setq i 0)
+
+      (while (< i (sslength lineSs))
+        (setq e (ssname lineSs i))
+        (entdel e)
+        (setq i (1+ i))
+      )
+    )
+  )
+)
+
+(defun pa-point-near-double-block-node-p (p blockNodes tol / hit item nodePt)
+  (setq hit nil)
+
+  (foreach item blockNodes
+    (setq nodePt (car item))
+
+    (if (< (distance p nodePt) tol)
+      (setq hit T)
+    )
+  )
+
+  hit
+)
+
+(defun pa-find-near-double-block-node (p blockNodes tol / best bestDist item nodePt d)
+  (setq best nil)
+  (setq bestDist nil)
+
+  (foreach item blockNodes
+    (setq nodePt (car item))
+    (setq d (distance p nodePt))
+
+    (if (and (< d tol)
+             (or (null bestDist) (< d bestDist))
+        )
+      (progn
+        (setq best item)
+        (setq bestDist d)
+      )
+    )
+  )
+
+  best
+)
+
+(defun pa-axis-dir-from-points (p otherPt / dx dy)
+  (setq dx (- (car otherPt) (car p)))
+  (setq dy (- (cadr otherPt) (cadr p)))
+
+  (if (>= (abs dx) (abs dy))
+    (if (>= dx 0.0) "R" "L")
+    (if (>= dy 0.0) "U" "D")
+  )
+)
+
+(defun pa-double-block-cut-factor (blockName dir / name)
+  (setq name (strcase blockName))
+
+  (cond
+    ((= name "Z02102001B") 0.55)
+    (T 1.0)
+  )
+)
+
+(defun pa-double-block-node-gap-by-dir (nodeItem dir / extents blockName factor gap)
+  (setq extents (cadddr nodeItem))
+  (setq blockName (nth 4 nodeItem))
+
+  (if extents
+    (progn
+      (setq gap
+        (cond
+          ((= dir "U") (nth 0 extents))
+          ((= dir "D") (nth 1 extents))
+          ((= dir "L") (nth 2 extents))
+          ((= dir "R") (nth 3 extents))
+          (T 0.0)
+        )
+      )
+      (setq factor (pa-double-block-cut-factor blockName dir))
+      (* gap factor)
+    )
+    0.0
+  )
+)
+
+(defun pa-double-pipe-end-gap (p otherPt dia blockNodes / tol nodeItem dir gap)
+  (setq tol (pa-double-pipe-block-node-tol))
+
+  (setq nodeItem (pa-find-near-double-block-node p blockNodes tol))
+  (if nodeItem
+    (progn
+      (setq dir (pa-axis-dir-from-points p otherPt))
+      (setq gap (pa-double-block-node-gap-by-dir nodeItem dir))
+    )
+    (setq gap 0.0)
+  )
+
+  gap
+)
+
+(defun pa-draw-double-line-gap (p1 p2 offset lineLayer gap1 gap2 / len maxGap q1 q2)
+  (setq len (distance p1 p2))
+  (setq maxGap (/ len 2.5))
+
+  (if (> gap1 maxGap) (setq gap1 maxGap))
+  (if (> gap2 maxGap) (setq gap2 maxGap))
+
+  (setq q1 (polar p1 (angle p1 p2) gap1))
+  (setq q2 (polar p2 (angle p2 p1) gap2))
+
+  (if (> (distance q1 q2) 1.0)
+    (pa-draw-double-line q1 q2 offset lineLayer)
+  )
+)
+
+(defun pa-double-block-name (oldName / name)
+  (setq name (strcase oldName))
+
+  (cond
+    ((= name "Z01051016B") "z02101001B")
+    ((= name "Z01051006B") "z02102002B")
+    ((= name "Z01051009B") "z02102001B")
+    ((= name "Z01051007B") "z02103001B")
+    ((= name "Z01051008B") "z02104001B")
+    ((= name "Z01051010B") "z02105001B")
+    ((= name "Z01051017B") "z02105002B")
+    ((= name "Z01051011B") "z02106001B")
+    ((= name "Z01051018B") "z02106002B")
+    ((= name "Z02021001B") "z02101001B")
+    ((= name "Z02021013B") "z02101001B")
+    ((= name "Z02021006B") "z02102002B")
+    ((= name "Z02021009B") "z02102001B")
+    ((= name "Z02021007B") "z02103001B")
+    ((= name "Z02021008B") "z02104001B")
+    ((= name "Z02021010B") "z02105001B")
+    ((= name "Z02021014B") "z02105002B")
+    ((= name "Z02021011B") "z02106001B")
+    ((= name "Z02021015B") "z02106002B")
+    (T nil)
+  )
+)
+
+(defun pa-nearest-node-dia (p nodeSizes / result bestDist item nodePt dia d)
+  (setq result 100.0)
+  (setq bestDist nil)
+
+  (foreach item nodeSizes
+    (setq nodePt (car item))
+    (setq dia (cadr item))
+    (setq d (distance p nodePt))
+
+    (if (or (null bestDist) (< d bestDist))
+      (progn
+        (setq bestDist d)
+        (setq result dia)
+      )
+    )
+  )
+
+  result
+)
+
+(defun pa-double-block-angle-offset (blkName / name)
+  (setq name (strcase blkName))
+
+  (cond
+    ((= name "Z02101001B") 0.0)
+    ((= name "Z02102002B") 270.0)
+    ((= name "Z02102001B") 0.0)
+    ((= name "Z02103001B") 270.0)
+    ((= name "Z02104001B") 270.0)
+    ((= name "Z02105001B") 180.0)
+    ((= name "Z02105002B") 180.0)
+    ((= name "Z02106001B") 180.0)
+    ((= name "Z02106002B") 180.0)
+    (T 0.0)
+  )
+)
+
+(defun pa-normalize-angle-rad (ang / twoPi)
+  (setq twoPi (* 2.0 pi))
+
+  (while (< ang 0.0)
+    (setq ang (+ ang twoPi))
+  )
+
+  (while (>= ang twoPi)
+    (setq ang (- ang twoPi))
+  )
+
+  ang
+)
+
+(defun pa-double-block-insert-angle (blkName oldAngleRad / offsetDeg)
+  (setq offsetDeg (pa-double-block-angle-offset blkName))
+  (pa-normalize-angle-rad (+ oldAngleRad (* pi (/ offsetDeg 180.0))))
+)
+
+(defun pa-insert-double-block (p blkName angleRad dia oldEd / scale layer insertAngle)
+  (setq scale (* (pa-get-block-scale) (/ dia 100.0)))
+  (setq layer (cdr (assoc 8 oldEd)))
+  (setq insertAngle (pa-double-block-insert-angle blkName angleRad))
+
+  (if (tblsearch "BLOCK" blkName)
+    (entmakex
+      (list
+        '(0 . "INSERT")
+        (cons 2 blkName)
+        (cons 8 (if layer layer "0"))
+        (cons 10 p)
+        (cons 41 scale)
+        (cons 42 scale)
+        (cons 43 scale)
+        (cons 50 insertAngle)
+      )
+    )
+    (progn
+      (princ
+        (strcat
+          "\n[DBG INSERTPIPEPARTS DOUBLE] missing block: "
+          blkName
+        )
+      )
+      nil
+    )
+  )
+)
+
+(defun pa-convert-double-blocks (blockSs nodeSizes / i e ed oldName newName p angle dia inserted count skipped)
+  (setq count 0)
+  (setq skipped 0)
+
+  (if blockSs
+    (progn
+      (setq i 0)
+
+      (while (< i (sslength blockSs))
+        (setq e (ssname blockSs i))
+        (setq ed (entget e))
+        (setq oldName (cdr (assoc 2 ed)))
+        (setq newName (pa-double-block-name oldName))
+
+        (if newName
+          (progn
+            (setq p (cdr (assoc 10 ed)))
+            (setq angle (cdr (assoc 50 ed)))
+            (if (null angle) (setq angle 0.0))
+            (setq dia (pa-nearest-node-dia p nodeSizes))
+
+            (princ
+              (strcat
+                "\n[DBG INSERTPIPEPARTS DOUBLE] replace "
+                oldName
+                " -> "
+                newName
+                " dia="
+                (pa-format-dia dia)
+              )
+            )
+
+            (setq inserted (pa-insert-double-block p newName angle dia ed))
+
+            (if inserted
+              (progn
+                (entdel e)
+                (setq count (1+ count))
+              )
+              (setq skipped (1+ skipped))
+            )
+          )
+          (progn
+            (setq skipped (1+ skipped))
+            (princ
+              (strcat
+                "\n[DBG INSERTPIPEPARTS DOUBLE] skip block: "
+                (if oldName oldName "")
+              )
+            )
+          )
+        )
+
+        (setq i (1+ i))
+      )
+    )
+  )
+
+  (princ
+    (strcat
+      "\n[DBG INSERTPIPEPARTS DOUBLE] converted blocks: "
+      (itoa count)
+      " skipped="
+      (itoa skipped)
+    )
+  )
+
+  count
+)
+
+(defun pa-draw-double-pipe-segments (segs / seg p1 p2 size dia offset lineLayer blockNodes gap1 gap2 count skipped)
+  (setq count 0)
+  (setq skipped 0)
+  (setq blockNodes (pa-get-double-pipe-block-nodes))
+
+  (foreach seg segs
+    (setq p1 (nth 0 seg))
+    (setq p2 (nth 1 seg))
+    (setq size (nth 2 seg))
+    (setq lineLayer (nth 3 seg))
+    (setq dia (atof size))
+
+    (if (> dia 0.0)
+      (progn
+        (setq offset (/ dia 2.0))
+        (setq gap1 (pa-double-pipe-end-gap p1 p2 dia blockNodes))
+        (setq gap2 (pa-double-pipe-end-gap p2 p1 dia blockNodes))
+        (pa-draw-double-line-gap p1 p2 offset lineLayer gap1 gap2)
+        (setq count (1+ count))
+      )
+      (progn
+        (setq skipped (1+ skipped))
+        (princ
+          (strcat
+            "\n[DBG INSERTPIPEPARTS DOUBLE] skipped segment: size="
+            (if size size "")
+          )
+        )
+      )
+    )
+  )
+
+  (princ
+    (strcat
+      "\n[DBG INSERTPIPEPARTS DOUBLE] double-line segments: "
+      (itoa count)
+      " skipped="
+      (itoa skipped)
+    )
+  )
+
+  count
+)
+
+(defun pa-convert-double-pipe-run (lineSs textSs blockSs / segs nodeSizes)
+  (if (and lineSs textSs)
+    (progn
+      (setq segs (pa-build-pipe-segments lineSs textSs))
+      (princ
+        (strcat
+          "\n[DBG INSERTPIPEPARTS DOUBLE] segment count: "
+          (itoa (length segs))
+        )
+      )
+
+      (setq nodeSizes (pa-build-node-sizes segs))
+      (princ
+        (strcat
+          "\n[DBG INSERTPIPEPARTS DOUBLE] node dia count: "
+          (itoa (length nodeSizes))
+        )
+      )
+
+      (if blockSs
+        (pa-convert-double-blocks blockSs nodeSizes)
+        (princ "\n[DBG INSERTPIPEPARTS DOUBLE] no blocks selected")
+      )
+
+      (pa-draw-double-pipe-segments segs)
+      (pa-delete-line-ss lineSs)
+
+      (princ "\n[DBG INSERTPIPEPARTS] double-line conversion done")
+    )
+    (princ "\nSelect LINE and pipe-size TEXT.")
+  )
+
+  (if (and lineSs textSs) T nil)
+)
+
+(defun pa-obsolete-doublepipe-command (/ ss lineSs textSs segs seg p1 p2 size lineLayer dia offset count skipped)
   (princ "\n複線化するLINEと管径TEXTを選択: ")
   (setq ss
     (ssget
@@ -786,3 +1350,7 @@
 
   (princ)
 )
+
+(setq c:CONVERTDOUBLEPIPE nil)
+(setq c:DOUBLEPIPE nil)
+(setq c:INSERTPIPEPARTS_DIA_TEST nil)
