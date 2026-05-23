@@ -503,9 +503,10 @@
   (setq dirs pa-current-insert-dirs)
   (setq cutDirs (pa-get-cut-dirs blkName dirs))
   (setq gap
-    (if (= blkName "z01051009B")
-      (* 1.32 scale)
-      (* 1.2 scale)
+    (cond
+      ((= blkName "z01051009B") (* 1.32 scale))
+      ((= blkName "z01051011B") (* 1.6 scale))
+      (T (* 1.2 scale))
     )
   )
 

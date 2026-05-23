@@ -149,7 +149,7 @@
 
     ;; 45-degree elbows.
     ((pa-same-dirs d '("R" "RU")) (list "DUCT_EL45" 0.0))
-    ((pa-same-dirs d '("U" "RU")) (list "DUCT_EL45" 0.0))
+    ((pa-same-dirs d '("U" "RU")) (list "z03104001B" 125.0))
 
     ((pa-same-dirs d '("U" "LU")) (list "DUCT_EL45" 90.0))
 
@@ -162,7 +162,7 @@
 
     ;; 135-degree elbows.
     ((pa-same-dirs d '("R" "LU")) (list "z03104001B" 0.0))
-    ((pa-same-dirs d '("R" "LD")) (list "z03104001B" 0.0))
+    ((pa-same-dirs d '("R" "LD")) (list "z03104001B" 125.0))
 
     ((pa-same-dirs d '("U" "RD")) (list "z03104001B" 90.0))
     ((pa-same-dirs d '("U" "LD")) (list "z03104001B" 225.0))
