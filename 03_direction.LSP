@@ -398,15 +398,15 @@
   (setq d (pa-sort-dirs dirs))
 
   (cond
-    ((pa-same-dirs d '("R" "LU")) (list "z01051008B" 135.0))
-    ((pa-same-dirs d '("U" "LD")) (list "z01051008B" 45.0))
-    ((pa-same-dirs d '("L" "RD")) (list "z01051008B" 135.0))
-    ((pa-same-dirs d '("D" "RU")) (list "z01051008B" 225.0))
+    ((pa-same-dirs d '("R" "LU")) (list "z01051008B" 315.0))
+    ((pa-same-dirs d '("U" "LD")) (list "z01051008B" 225.0))
+    ((pa-same-dirs d '("L" "RD")) (list "z01051008B" 315.0))
+    ((pa-same-dirs d '("D" "RU")) (list "z01051008B" 45.0))
 
-    ((pa-same-dirs d '("R" "LD")) (list "z01051008B" 180.0))
-    ((pa-same-dirs d '("D" "LU")) (list "z01051008B" 90.0))
-    ((pa-same-dirs d '("L" "RU")) (list "z01051008B" 180.0))
-    ((pa-same-dirs d '("U" "RD")) (list "z01051008B" 270.0))
+    ((pa-same-dirs d '("R" "LD")) (list "z01051008B" 0.0))
+    ((pa-same-dirs d '("D" "LU")) (list "z01051008B" 270.0))
+    ((pa-same-dirs d '("L" "RU")) (list "z01051008B" 0.0))
+    ((pa-same-dirs d '("U" "RD")) (list "z01051008B" 90.0))
 
     (T nil)
   )
