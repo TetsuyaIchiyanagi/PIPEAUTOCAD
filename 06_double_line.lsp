@@ -31,6 +31,281 @@
   )
 )
 
+(defun pa-double-drain-layer-name ()
+  "MEP_排水"
+)
+
+(defun pa-entity-on-double-drain-layer-p (e / ed layer)
+  (setq ed (entget e))
+  (setq layer (cdr (assoc 8 ed)))
+
+  (= layer (pa-double-drain-layer-name))
+)
+
+(defun pa-filter-double-drain-layer (ss / result i e)
+  (setq result (ssadd))
+  (setq i 0)
+
+  (while (< i (sslength ss))
+    (setq e (ssname ss i))
+
+    (if (pa-entity-on-double-drain-layer-p e)
+      (ssadd e result)
+    )
+
+    (setq i (1+ i))
+  )
+
+  (if (> (sslength result) 0)
+    result
+    nil
+  )
+)
+
+(defun pa-merge-selection-sets (a b / result i e)
+  (setq result (ssadd))
+
+  (if a
+    (progn
+      (setq i 0)
+      (while (< i (sslength a))
+        (ssadd (ssname a i) result)
+        (setq i (1+ i))
+      )
+    )
+  )
+
+  (if b
+    (progn
+      (setq i 0)
+      (while (< i (sslength b))
+        (ssadd (ssname b i) result)
+        (setq i (1+ i))
+      )
+    )
+  )
+
+  (if (> (sslength result) 0)
+    result
+    nil
+  )
+)
+
+(defun pa-insert-block-name (e / ed obj name result)
+  (setq ed (entget e))
+  (setq name (cdr (assoc 2 ed)))
+
+  (if e
+    (progn
+      (setq obj (vlax-ename->vla-object e))
+      (setq result (vl-catch-all-apply 'vlax-get-property (list obj 'EffectiveName)))
+
+      (if (not (vl-catch-all-error-p result))
+        (setq name result)
+      )
+    )
+  )
+
+  name
+)
+
+(defun pa-insert-block-name-candidates (e / ed obj names value)
+  (setq ed (entget e))
+  (setq obj (vlax-ename->vla-object e))
+  (setq names '())
+
+  (setq value (cdr (assoc 2 ed)))
+  (if value
+    (setq names (cons value names))
+  )
+
+  (setq value (vl-catch-all-apply 'vlax-get-property (list obj 'Name)))
+  (if (and (not (vl-catch-all-error-p value)) value)
+    (setq names (cons value names))
+  )
+
+  (setq value (vl-catch-all-apply 'vlax-get-property (list obj 'EffectiveName)))
+  (if (and (not (vl-catch-all-error-p value)) value)
+    (setq names (cons value names))
+  )
+
+  (pa-unique-list2 names)
+)
+
+(defun pa-double-block-name-from-candidates (names / result name)
+  (setq result nil)
+
+  (foreach name names
+    (if (and (null result) (pa-double-block-name name))
+      (setq result (pa-double-block-name name))
+    )
+  )
+
+  result
+)
+
+(defun pa-debug-name-list (names / text name)
+  (setq text "")
+
+  (foreach name names
+    (if (= text "")
+      (setq text name)
+      (setq text (strcat text "," name))
+    )
+  )
+
+  text
+)
+
+(defun pa-debug-double-insert-selection (label ss / i e ed layer handle names newName)
+  (princ
+    (strcat
+      "\n[DBG INSERTPIPEPARTS DOUBLE] "
+      label
+      " insert count: "
+      (if ss (itoa (sslength ss)) "0")
+    )
+  )
+
+  (if ss
+    (progn
+      (setq i 0)
+
+      (while (< i (sslength ss))
+        (setq e (ssname ss i))
+        (setq ed (entget e))
+        (setq layer (cdr (assoc 8 ed)))
+        (setq handle (cdr (assoc 5 ed)))
+        (setq names (pa-insert-block-name-candidates e))
+        (setq newName (pa-double-block-name-from-candidates names))
+
+        (princ
+          (strcat
+            "\n[DBG INSERTPIPEPARTS DOUBLE] "
+            label
+            " insert "
+            (itoa (1+ i))
+            " handle="
+            (if handle handle "")
+            " layer="
+            (if layer layer "")
+            " names="
+            (pa-debug-name-list names)
+            " target="
+            (if newName newName "-")
+          )
+        )
+
+        (setq i (1+ i))
+      )
+    )
+  )
+)
+
+(defun pa-filter-double-convertible-blocks (ss / result i e)
+  (setq result (ssadd))
+
+  (if ss
+    (progn
+      (setq i 0)
+
+      (while (< i (sslength ss))
+        (setq e (ssname ss i))
+
+        (if (pa-double-block-name-from-candidates (pa-insert-block-name-candidates e))
+          (ssadd e result)
+        )
+
+        (setq i (1+ i))
+      )
+    )
+  )
+
+  (if (> (sslength result) 0)
+    result
+    nil
+  )
+)
+
+(defun pa-point-on-line-ss-p (p lineSs tol / i e ed p1 p2 hit)
+  (setq hit nil)
+
+  (if (and p lineSs)
+    (progn
+      (setq i 0)
+
+      (while (and (< i (sslength lineSs)) (not hit))
+        (setq e (ssname lineSs i))
+        (setq ed (entget e))
+        (setq p1 (cdr (assoc 10 ed)))
+        (setq p2 (cdr (assoc 11 ed)))
+
+        (if (and p1 p2 (pa-point-on-seg2 p p1 p2 tol))
+          (setq hit T)
+        )
+
+        (setq i (1+ i))
+      )
+    )
+  )
+
+  hit
+)
+
+(defun pa-double-block-on-line-ss-p (e lineSs / ed p center tol)
+  (setq ed (entget e))
+  (setq p (cdr (assoc 10 ed)))
+  (setq center (pa-double-pipe-block-bbox-center e))
+  (setq tol (pa-double-pipe-block-node-tol))
+
+  (or
+    (pa-point-on-line-ss-p p lineSs tol)
+    (pa-point-on-line-ss-p center lineSs tol)
+  )
+)
+
+(defun pa-filter-double-blocks-on-lines (ss lineSs / result i e)
+  (setq result (ssadd))
+
+  (if ss
+    (progn
+      (setq i 0)
+
+      (while (< i (sslength ss))
+        (setq e (ssname ss i))
+
+        (if (pa-double-block-on-line-ss-p e lineSs)
+          (ssadd e result)
+        )
+
+        (setq i (1+ i))
+      )
+    )
+  )
+
+  (if (> (sslength result) 0)
+    result
+    nil
+  )
+)
+
+(defun pa-get-double-blocks-on-lines (lineSs / ss)
+  (setq ss
+    (ssget
+      "_X"
+      '((0 . "INSERT"))
+    )
+  )
+
+  (if ss
+    (pa-filter-double-blocks-on-lines
+      (pa-filter-double-convertible-blocks ss)
+      lineSs
+    )
+    nil
+  )
+)
+
 (defun pa-pipe-seg-text-search-radius (/ txtH)
   (setq txtH (pa-pipe-size-text-height))
   (max 500.0 (* txtH 5.0))
@@ -122,11 +397,11 @@
   (setq ss
     (ssget
       "_X"
-      (list
-        '(0 . "INSERT")
-        (cons 2 (pa-double-pipe-break-block-names))
-      )
+      '((0 . "INSERT"))
     )
+  )
+  (if ss
+    (setq ss (pa-filter-double-convertible-blocks ss))
   )
 
   (if ss
@@ -138,7 +413,7 @@
         (setq ed (entget e))
         (setq p (cdr (assoc 10 ed)))
         (setq handle (cdr (assoc 5 ed)))
-        (setq blockName (cdr (assoc 2 ed)))
+        (setq blockName (pa-insert-block-name e))
         (setq bboxInfo (pa-double-pipe-block-bbox-info e))
         (if bboxInfo
           (setq center (car bboxInfo))
@@ -1107,7 +1382,7 @@
 )
 
 (defun pa-insert-double-block (p blkName angleRad dia oldEd / scale layer insertAngle)
-  (setq scale (* (pa-get-block-scale) (/ dia 100.0)))
+  (setq scale dia)
   (setq layer (cdr (assoc 8 oldEd)))
   (setq insertAngle (pa-double-block-insert-angle blkName angleRad))
 
@@ -1136,7 +1411,7 @@
   )
 )
 
-(defun pa-convert-double-blocks (blockSs nodeSizes / i e ed oldName newName p angle dia inserted count skipped)
+(defun pa-convert-double-blocks (blockSs nodeSizes / i e ed oldName names newName p angle dia inserted count skipped)
   (setq count 0)
   (setq skipped 0)
 
@@ -1147,8 +1422,9 @@
       (while (< i (sslength blockSs))
         (setq e (ssname blockSs i))
         (setq ed (entget e))
-        (setq oldName (cdr (assoc 2 ed)))
-        (setq newName (pa-double-block-name oldName))
+        (setq oldName (pa-insert-block-name e))
+        (setq names (pa-insert-block-name-candidates e))
+        (setq newName (pa-double-block-name-from-candidates names))
 
         (if newName
           (progn
