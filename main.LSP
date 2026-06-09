@@ -28,6 +28,14 @@
   (and path (pa:safe-findfile path))
 )
 
+(defun pa:safe-directory-files (dir pattern directories / result)
+  (setq result (vl-catch-all-apply 'vl-directory-files (list dir pattern directories)))
+  (if (vl-catch-all-error-p result)
+    nil
+    result
+  )
+)
+
 (defun pa:project-dir-p (path / dir)
   (setq dir (pa:add-trailing-slash path))
   (and
@@ -59,11 +67,70 @@
   )
 )
 
+(defun pa:add-user-onedrive-roots (roots userprofile / names name)
+  (if (and userprofile (/= userprofile ""))
+    (progn
+      (setq names (pa:safe-directory-files userprofile "OneDrive*" -1))
+      (while names
+        (setq name (car names))
+        (if (and (/= name ".") (/= name ".."))
+          (setq roots (pa:add-root roots (strcat userprofile "/" name)))
+        )
+        (setq names (cdr names))
+      )
+    )
+  )
+  roots
+)
+
+(defun pa:add-user-root (roots userprofile name)
+  (if (and userprofile (/= userprofile ""))
+    (pa:add-root roots (strcat userprofile "/" name))
+    roots
+  )
+)
+
+(defun pa:add-nearby-roots (roots file / dir parent)
+  (if file
+    (progn
+      (setq dir (vl-filename-directory file))
+      (if dir
+        (progn
+          (setq roots (pa:add-root roots dir))
+          (setq parent (vl-filename-directory dir))
+          (if parent
+            (progn
+              (setq roots (pa:add-root roots parent))
+              (setq roots (pa:add-root roots (strcat parent "/PipeAutoCAD")))
+              (setq roots (pa:add-root roots (strcat parent "/PIPEAUTOCAD")))
+            )
+          )
+        )
+      )
+    )
+  )
+  roots
+)
+
+(defun pa:add-matching-subdirs (paths dir pattern / names name)
+  (setq names (pa:safe-directory-files dir pattern -1))
+  (while names
+    (setq name (car names))
+    (if (and (/= name ".") (/= name ".."))
+      (setq paths (pa:add-root paths (strcat dir name)))
+    )
+    (setq names (cdr names))
+  )
+  paths
+)
+
 (defun pa:add-project-candidates (paths root / dir)
   (setq dir (pa:add-trailing-slash root))
   (if dir
     (progn
       (setq paths (pa:add-root paths dir))
+      (setq paths (pa:add-matching-subdirs paths dir "PipeAutoCAD*"))
+      (setq paths (pa:add-matching-subdirs paths dir "PIPEAUTOCAD*"))
       (setq paths (pa:add-root paths (strcat dir "PipeAutoCAD")))
       (setq paths (pa:add-root paths (strcat dir "PIPEAUTOCAD")))
       (setq paths (pa:add-root paths (strcat dir "LISP/PipeAutoCAD")))
@@ -85,10 +152,19 @@
   (setq userprofile (getenv "USERPROFILE"))
   (if (and userprofile (/= userprofile ""))
     (progn
+      (setq roots (pa:add-root roots userprofile))
       (setq roots (pa:add-root roots (strcat userprofile "/OneDrive")))
+      (setq roots (pa:add-user-onedrive-roots roots userprofile))
+      (setq roots (pa:add-user-root roots userprofile "Documents"))
+      (setq roots (pa:add-user-root roots userprofile "Desktop"))
+      (setq roots (pa:add-user-root roots userprofile "Downloads"))
     )
   )
+  (setq roots (pa:add-nearby-roots roots pa-main-file))
   (setq roots (pa:add-root roots "C:/LISP/PipeAutoCAD"))
+  (setq roots (pa:add-root roots "C:/LISP/PIPEAUTOCAD"))
+  (setq roots (pa:add-root roots "C:/PipeAutoCAD"))
+  (setq roots (pa:add-root roots "C:/PIPEAUTOCAD"))
 
   (while roots
     (setq paths (pa:add-project-candidates paths (car roots)))
@@ -141,6 +217,10 @@
   )
   (progn
     (princ "\nPipeAutoCAD error: PipeAutoCAD folder was not found.")
-    (princ "\nSet PIPEAUTOCAD_PATH or put the folder directly under OneDrive.")
+    (if pa-main-file
+      (princ (strcat "\nLoaded main.LSP from: " pa-main-file))
+    )
+    (princ "\nCopy the whole PipeAutoCAD folder, not only main.LSP.")
+    (princ "\nSet PIPEAUTOCAD_PATH or put the folder under OneDrive, Documents, Desktop, Downloads, or C:/LISP.")
   )
 )
