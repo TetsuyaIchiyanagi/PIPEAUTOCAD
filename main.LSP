@@ -52,6 +52,10 @@
       (pa:file-exists-p (strcat dir "07_duct_double_line.LSP"))
       (pa:file-exists-p (strcat dir "07_duct_double_line.lsp"))
     )
+    (or
+      (pa:file-exists-p (strcat dir "08_mep_cross_cut.LSP"))
+      (pa:file-exists-p (strcat dir "08_mep_cross_cut.lsp"))
+    )
   )
 )
 
@@ -211,6 +215,7 @@
     (load (strcat pa-path "05_pipe_size_text.lsp"))
     (load (strcat pa-path "06_double_line.lsp"))
     (load (strcat pa-path "07_duct_double_line.lsp"))
+    (load (strcat pa-path "08_mep_cross_cut.lsp"))
 
     (princ "\nPipeAutoCAD loaded.")
     (princ (strcat "\nPipeAutoCAD path: " pa-path))
@@ -219,6 +224,7 @@
     (princ "\nCommand: CHECKPIPESEG")
     (princ "\nCommand: CHECKNODESIZE")
     (princ "\nCommand: DUCTDOUBLE")
+    (princ "\nCommand: MEPCROSSCUT")
   )
   (progn
     (princ "\nPipeAutoCAD error: PipeAutoCAD folder was not found.")
