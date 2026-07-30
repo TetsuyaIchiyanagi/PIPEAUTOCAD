@@ -592,7 +592,7 @@
   )
 )
 
-(defun c:INSERTPIPEPARTS (/ *error* olderr ss lineSs textSs partSs nodes item p dirs info blk ang count flowPt systemType waterType drainLineMode)
+(defun c:INSERTPIPEPARTS (/ *error* olderr ss lineSs textSs partSs selectedPartSs autoPartSs nodes item p dirs info blk ang count flowPt systemType waterType drainLineMode)
 
   (setq olderr *error*)
   (setq pa-debug-step "command start")
@@ -697,6 +697,9 @@
 
       (setq pa-debug-step "filter selected LINE")
       (setq lineSs (pa-filter-lines ss))
+      (if (and (= systemType "D") (= drainLineMode "D") lineSs)
+        (setq lineSs (pa-filter-double-drain-layer lineSs))
+      )
       (if lineSs
         (princ (strcat "\n[DBG INSERTPIPEPARTS] selected lines: " (itoa (sslength lineSs))))
         (princ "\n[DBG INSERTPIPEPARTS] selected lines: 0")
@@ -712,7 +715,23 @@
 
       (setq pa-debug-step "filter selected target blocks")
       (if (and (= systemType "D") (= drainLineMode "D"))
-        (setq partSs (pa-filter-inserts ss))
+        (progn
+          (setq selectedPartSs (pa-filter-inserts ss))
+          (pa-debug-double-insert-selection "selected" selectedPartSs)
+
+          (if selectedPartSs
+            (setq selectedPartSs (pa-filter-double-convertible-blocks selectedPartSs))
+          )
+          (pa-debug-double-insert-selection "selected convertible" selectedPartSs)
+
+          (if lineSs
+            (setq autoPartSs (pa-get-double-blocks-on-lines lineSs))
+            (setq autoPartSs nil)
+          )
+          (pa-debug-double-insert-selection "auto on drain lines" autoPartSs)
+
+          (setq partSs (pa-merge-selection-sets selectedPartSs autoPartSs))
+        )
         (setq partSs (pa-filter-blocks-by-name ss "z01051001B,z02021001B"))
       )
       (if partSs
@@ -734,12 +753,21 @@
 
           (cond
             ((and (= systemType "D") (= drainLineMode "D"))
-              (if textSs
-                (progn
+              (cond
+                (textSs
                   (setq pa-debug-step "convert double pipe")
                   (pa-convert-double-pipe-run lineSs textSs partSs)
                 )
-                (princ "\n[DBG INSERTPIPEPARTS] double-line drain mode requires pipe-size TEXT")
+
+                (partSs
+                  (setq pa-debug-step "convert double pipe with default size")
+                  (princ "\n[DBG INSERTPIPEPARTS] double-line drain mode has no pipe-size TEXT; use default dia=100")
+                  (pa-convert-double-pipe-run-default-dia lineSs partSs 100.0)
+                )
+
+                (T
+                  (princ "\n[DBG INSERTPIPEPARTS] double-line drain mode requires pipe-size TEXT")
+                )
               )
             )
 
