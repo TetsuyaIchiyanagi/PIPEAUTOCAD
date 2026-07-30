@@ -120,13 +120,14 @@
       (setq paths (pa:add-path-if-project paths base))
       (setq paths (pa:add-path-if-project paths (strcat base "PIPEAUTOCAD")))
       (setq paths (pa:add-path-if-project paths (strcat base "PipeAutoCAD")))
+      (setq paths (pa:add-path-if-project paths (strcat base "PipeAutocad")))
 
       (setq projects (pa:safe-directory-files base nil -1))
       (while projects
         (setq project (car projects))
         (if (and
               (not (member project '("." "..")))
-              (wcmatch (strcase project) "PROJECT*")
+              (wcmatch (strcase project) "*PROJECT*")
             )
           (progn
             (setq cad-root (strcat base project "/02_CAD/02_Auto_Cad/"))
@@ -140,6 +141,7 @@
                 (progn
                   (setq paths (pa:add-path-if-project paths (strcat cad-root tool-root "/PIPEAUTOCAD")))
                   (setq paths (pa:add-path-if-project paths (strcat cad-root tool-root "/PipeAutoCAD")))
+                  (setq paths (pa:add-path-if-project paths (strcat cad-root tool-root "/PipeAutocad")))
                 )
               )
               (setq tool-roots (cdr tool-roots))
@@ -224,6 +226,6 @@
       (princ (strcat "\nLoaded main.LSP from: " pa-main-file))
     )
     (princ "\nSync the shared OneDrive folder on this PC.")
-    (princ "\nExpected location: OneDrive*/Project_*/02_CAD/02_Auto_Cad/08_CAD*/PIPEAUTOCAD")
+    (princ "\nExpected location: OneDrive*/*Project*/02_CAD/02_Auto_Cad/08_CAD*/PIPEAUTOCAD")
   )
 )
