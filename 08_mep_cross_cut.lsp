@@ -3,7 +3,7 @@
 ;; MEPCROSSCUT cuts LINE/LWPOLYLINE entities around crossing points.
 
 (defun pa-mep-cross-target-layers ()
-  '("MEP_排水" "MEP_ガス" "MEP_給湯" "MEP_給水")
+  '("MEP_排水" "MEP_雨水" "MEP_ガス" "MEP_給湯" "MEP_給水")
 )
 
 (setq pa-mep-cross-debug-enabled nil)
@@ -980,13 +980,13 @@
   (setq gap defaultGap)
   (pa-mep-cross-set-step "start" (strcat "gap=" (rtos gap 2 3)))
 
-  (princ "\nMEP_給水/排水/ガス/給湯 の LINE または LWPOLYLINE を選択: ")
+  (princ "\nMEP_給水/排水/雨水/ガス/給湯 の LINE または LWPOLYLINE を選択: ")
   (setq ss
     (ssget
       '(
         (-4 . "<AND")
           (0 . "LINE,LWPOLYLINE")
-          (8 . "MEP_給水,MEP_排水,MEP_ガス,MEP_給湯")
+          (8 . "MEP_給水,MEP_排水,MEP_雨水,MEP_ガス,MEP_給湯")
         (-4 . "AND>")
       )
     )

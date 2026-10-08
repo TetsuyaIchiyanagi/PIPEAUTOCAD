@@ -216,6 +216,10 @@
     (load (strcat pa-path "06_double_line.lsp"))
     (load (strcat pa-path "07_duct_double_line.lsp"))
     (load (strcat pa-path "08_mep_cross_cut.lsp"))
+    (load (strcat pa-path "09_detail_cut.lsp"))
+    (load (strcat pa-path "10_kikiset.lsp"))
+    (load (strcat pa-path "KIKITABLE.lsp"))
+    (load (strcat pa-path "garari_table.lsp"))
 
     (princ "\nPipeAutoCAD loaded.")
     (princ (strcat "\nPipeAutoCAD path: " pa-path))
@@ -225,6 +229,10 @@
     (princ "\nCommand: CHECKNODESIZE")
     (princ "\nCommand: DUCTDOUBLE")
     (princ "\nCommand: MEPCROSSCUT")
+    (princ "\nCommand: DETAILCUT")
+    (princ "\nCommand: KIKISET")
+    (princ "\nCommand: KIKITABLE")
+    (princ "\nCommand: GARARITABLE")
   )
   (progn
     (princ "\nPipeAutoCAD error: PipeAutoCAD folder was not found.")
