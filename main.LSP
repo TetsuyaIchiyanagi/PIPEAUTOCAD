@@ -218,8 +218,9 @@
     (load (strcat pa-path "08_mep_cross_cut.lsp"))
     (load (strcat pa-path "09_detail_cut.lsp"))
     (load (strcat pa-path "10_kikiset.lsp"))
-    (load (strcat pa-path "KIKITABLE.lsp"))
-    (load (strcat pa-path "garari_table.lsp"))
+    (load (strcat pa-path "11_kikitable.lsp"))
+    (load (strcat pa-path "12_garari_table.lsp"))
+    ;; Optional diagnostics/tests: APPLOAD 13_diagnostics_tests.lsp separately.
 
     (princ "\nPipeAutoCAD loaded.")
     (princ (strcat "\nPipeAutoCAD path: " pa-path))

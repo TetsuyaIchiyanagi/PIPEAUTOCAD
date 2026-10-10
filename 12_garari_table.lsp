@@ -4,8 +4,8 @@
   (cond
     ((and (boundp '*load-truename*) *load-truename*) (vl-filename-directory *load-truename*))
     ((and (boundp '*load-pathname*) *load-pathname*) (vl-filename-directory *load-pathname*))
-    ((findfile "garari_table.lsp") (vl-filename-directory (findfile "garari_table.lsp")))
-    ((and (boundp 'pa-path) pa-path (findfile (strcat pa-path "garari_table.lsp"))) pa-path)))
+    ((findfile "12_garari_table.lsp") (vl-filename-directory (findfile "12_garari_table.lsp")))
+    ((and (boundp 'pa-path) pa-path (findfile (strcat pa-path "12_garari_table.lsp"))) pa-path)))
 (setq garari:config '((fd-temp . "72") (mesh-spec . "10") (sound . "なし")
   (order . natural) (widths 8 28 28 48) (floor-width . 7) (note-width . 24)
   (page-height . 680) (show-result . T)))

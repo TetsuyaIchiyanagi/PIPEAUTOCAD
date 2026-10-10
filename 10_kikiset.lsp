@@ -13,8 +13,18 @@
           (write-line (strcat (itoa (getvar "MILLISECS")) " : " message) f)
           (close f)))))
   (princ))
-;; 全員共通の参照先。ユーザー名やOneDrive同期フォルダには依存しない。
-(setq ks:master-source "https://sanmon.sharepoint.com/:x:/s/sanmon2/IQDPsk_iCte0Q44BOPlTXgG1Act5tUXbBxZYr7ZCH40Y30A?e=jsSooy")
+;; このLISPと同じフォルダのExcelを使用。PC固有の絶対パスは固定しない。
+(setq ks:source-directory
+  (cond
+    ((and (boundp '*load-truename*) *load-truename*)
+      (vl-filename-directory *load-truename*))
+    ((and (boundp '*load-pathname*) *load-pathname*)
+      (vl-filename-directory *load-pathname*))
+    ((and (boundp 'pa-path) pa-path) pa-path)
+    ((findfile "10_kikiset.lsp") (vl-filename-directory (findfile "10_kikiset.lsp")))))
+(setq ks:master-source
+  (if ks:source-directory
+    (strcat (vl-string-right-trim "/\\" ks:source-directory) "/機器マスター_空調.xlsx")))
 (setq ks:remote-cache-minutes 5)
 ;; マスターの登録日。Excel日付または YYYY-MM-DD / YYYY/MM/DD を使用する。
 (setq ks:registered-date-key "REGISTERED_DATE")
@@ -197,7 +207,13 @@
   (ks:trace (strcat "GET ATTRIBUTES END / COUNT=" (itoa (length result))))
   result)
 
-(defun ks:file () ks:master-source)
+(defun ks:file ()
+  (if (null ks:master-source)
+    (ks:fail "KIKISETのフォルダを特定できません。main.LSPまたは10_kikiset.lspを再読込みしてください。"))
+  (if (not (findfile ks:master-source))
+    (ks:fail (strcat "機器マスターが存在しません：" ks:master-source
+      "\n10_kikiset.lspと同じフォルダに機器マスター_空調.xlsxを配置してください。")))
+  ks:master-source)
 (defun ks:download-master (url / http stream result body bytes download-url)
   (ks:trace "DOWNLOAD BEGIN / WINHTTP CREATE")
   (princ "\nSharePointから機器マスターを取得しています…")
@@ -533,7 +549,7 @@
       (setq ks:stage "属性の取得" attrs (ks:get-attributes block))
       (if (null attrs) (ks:fail "編集可能な属性がありません。定数属性は対象外です。"))
       (princ (strcat "\nブロックを取得しました。編集可能な属性数：" (itoa (length attrs))))
-      (setq ks:stage "Excelファイル選択")
+      (setq ks:stage "ローカル機器マスターの確認")
       (if (setq path (ks:file))
         (progn
           (setq ks:stage "Excelマスター読み込み・機種選択"

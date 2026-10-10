@@ -1,10 +1,23 @@
-﻿# KIKITABLE：空調・換気機器表の更新
+# KIKITABLE：空調・換気機器表の更新
+
+## モジュール整理（2026-10-11）
+
+| ファイル | 用途 | 読込み |
+|---|---|---|
+| `11_kikitable.lsp` | 空調・換気の機器表出力 | `main.LSP`で自動 |
+| `12_garari_table.lsp` | ガラリ機器表出力 | `main.LSP`で自動 |
+| `13_diagnostics_tests.lsp` | 詳細切断・機器設定・機器表・ガラリの診断と全テスト | 必要時のみAPPLOAD |
+
+12個のテストファイルと1個の診断ファイルを13番へ統合し、元ファイルは削除しました。既存の診断・テストコマンド名は維持しています。`main.LSP`の後に13番を1回読み込めば、従来の個別テストファイルの読込みは不要です。通常操作では13番を読み込む必要はありません。
+
+統合後の全モジュールをAutoCAD 2026 Core Consoleで読み込み、図面・Excelへの書込みを伴わない209項目の回帰テストが成功しました。CAD操作・Excel COMの書込みテストは今回実行していません。
+
 
 ## 完成コードと導入
 
-本体は同じフォルダの **KIKITABLE.lsp** です。外部ライブラリやKIKISETのロードは不要です。Windows版AutoCADのVisual LISP / ActiveXとデスクトップ版Excelを使用します。
+本体は同じフォルダの **11_kikitable.lsp** です。外部ライブラリやKIKISETのロードは不要です。Windows版AutoCADのVisual LISP / ActiveXとデスクトップ版Excelを使用します。
 
-1. AutoCADで`APPLOAD`を実行し、`KIKITABLE.lsp`を読み込みます。`main.LSP`からの読み込みにも登録済みです。
+1. AutoCADで`APPLOAD`を実行し、`11_kikitable.lsp`を読み込みます。`main.LSP`からの読み込みにも登録済みです。
 2. 日本語を含むUTF-8コードです。`LISPSYS`は1または2を使用し、変更した場合はAutoCADを再起動してください。
 3. 図面に`KUCHO_KIKI`を配置し、属性を入力します。`SYSTEM`・`NUM`・`LOCATION`・`FLOOR`は配置ごとに設定します。FLOORは`1`、`2`等の整数表記にします。`KIKI_NO`・`PREFIX`属性の新設は不要です。
 4. 案件Excelを閉じ、AutoCADで`KIKITABLE`を実行します。Enterまたは「空調」で空調、「換気」で換気を選択します。
@@ -60,10 +73,10 @@
 
 2026-09-25、SYSTEM・NUM方式への改訂後にAutoCAD 2026 Core Consoleで集計・記号生成54項目、KIKISET保持ルール14項目が通過しました。Excel COMの書込み・保存・再読込み・書式継承・再更新・書込みエラー処理・開かれている対象Excelの更新拒否・実属性と派生列の出力を含む33項目も、一時ブックで通過しました。試験終了後にテスト用Excelの残留がなく、既存のユーザーExcelが維持されていることを確認しました。実案件の帳票レイアウトと印刷外観、動的ブロックを含む図面収集、対話中のEscは通常のAutoCAD画面での確認が残ります。
 
-このPCのCore Consoleでは、通常のLINEでも`vlax-ename->vla-object`が失敗し、図面オブジェクトのActiveX変換を実行できませんでした。図面収集用の`KIKITABLE_CAD_tests.lsp`は、通常のAutoCADで新規の作業用図面にロードし、`KIKITABLECADTEST`で確認してください。試験用ブロック定義が残るので実案件DWGでは実行しないでください。
+このPCのCore Consoleでは、通常のLINEでも`vlax-ename->vla-object`が失敗し、図面オブジェクトのActiveX変換を実行できませんでした。図面収集用の`13_diagnostics_tests.lsp`は、通常のAutoCADで新規の作業用図面にロードし、`KIKITABLECADTEST`で確認してください。試験用ブロック定義が残るので実案件DWGでは実行しないでください。
 
-1. `KIKITABLE_tests.lsp`をAPPLOADし、`KIKITABLETEST`を実行します。集計とCOM空配列変換を試験し、図面・Excelは変更しません。SYSTEM・NUM方式への改訂後、Core Consoleで54項目が通過しました。
-2. `KIKITABLE_COM_tests.lsp`もAPPLOADし、`KIKITABLECOMTEST`を実行します。一時フォルダに専用xlsxを作り、保存・再読込み・書式コピー・古いデータ消去・書込みエラー時の非保存を確認します。終了時にテストブックのパスを表示します。
+1. `13_diagnostics_tests.lsp`をAPPLOADし、`KIKITABLETEST`を実行します。集計とCOM空配列変換を試験し、図面・Excelは変更しません。SYSTEM・NUM方式への改訂後、Core Consoleで54項目が通過しました。
+2. 同じモジュールに含まれる`KIKITABLECOMTEST`を実行します。一時フォルダに専用xlsxを作り、保存・再読込み・書式コピー・古いデータ消去・書込みエラー時の非保存を確認します。終了時にテストブックのパスを表示します。
 3. 作業用DWGと案件Excelのコピーで、PAC-7を職員室2Fに2台、会議室1Fに1台配置します。職員室(2)、2F=2、会議室1F=1、最終場所行の数量=3を確認します。
 4. PAC-2・PAC-10を追加し、自然順と7行ピッチ、追加枠の書式、印刷プレビューを確認します。
 5. MODEL不一致、FLOOR未入力、階列不足、NOTE違い、7か所以上の場所を試し、警告とCAD_DATAの元データを確認します。
@@ -102,7 +115,7 @@ AutoCAD 2026 Core Consoleで、空調の既存規則・選択・集計100件、�
 
 通常AutoCADの実ブロック選択・属性書込み・対話中Escはこの環境では未実施です。初回は図面コピーで、KIKISET → 換気 → KANKI_KIKI → VD-10ZVC7を選択し、SYSTEM・NUM・LOCATION・FLOORが保持されることを確認してください。その後、案件Excelコピーを指定してKIKITABLE → 換気を実行します。両方の.lspをAPPLOADで再読込みしてください。
 
-テストコードはKANKI_tests.lspです。KIKITABLE_tests.lsp、KIKISET_MASTER_tests.lspと両本体を先に読み込み、KANKITESTで純粋処理を検証できます。kvt:master-testは読取り専用、kvt:book-testとkvt:aircon-book-testは指定Excelを書き換えるため必ず一時コピーを指定してください。
+両本体の後に`13_diagnostics_tests.lsp`を読み込み、KANKITESTで純粋処理を検証できます。kvt:master-testは読取り専用、kvt:book-testとkvt:aircon-book-testは指定Excelを書き換えるため必ず一時コピーを指定してください。
 
 ## 設備カテゴリの番号選択
 
@@ -120,7 +133,7 @@ KIKISETの転記対象にも上記4属性を追加。DWGはユーザーが編集
 
 ## L3：帳票書込みの遅延対策（2026-10-08）
 
-`KIKITABLE.lsp`をAPPLOADで再読込みしてください。読込み時に「KIKITABLE L3（範囲単位書込み）」と表示します。図面収集・集約・帳票の仕様は継続しています。
+`11_kikitable.lsp`をAPPLOADで再読込みしてください。読込み時に「KIKITABLE L3（範囲単位書込み）」と表示します。図面収集・集約・帳票の仕様は継続しています。
 
 ### 確認した原因
 
@@ -152,6 +165,6 @@ KIKISETの転記対象にも上記4属性を追加。DWGはユーザーが編集
 
 検証は空調の純粋処理62項目、通常換気20項目、全熱交換器23項目、保存・再読込み・書式継承・開かれたブックの拒否・書込みエラー時の非保存33項目、一括転記20項目の計158項目が成功しました。既存COMテストの機器名称の期待値は、古い固定文字列ではなく現在のequipment-name設定と照合するよう修正しました。
 
-`KIKITABLE_BULK_tests.lsp`は、本体・KIKITABLE_tests.lsp・KIKITABLE_COM_tests.lspの後にロードしてKIKITABLEBULKTESTを実行します。専用の未保存テストブックで、文字列の先頭ゼロ・数式化防止・数量と電力の数値型・空欄・1,001台の500行境界・減少時の古い値消去・枠をまたぐ結合の拒否・計算モード復元・COM解放を確認します。実案件の図面とExcelは変更しません。
+本体の後に`13_diagnostics_tests.lsp`をロードしてKIKITABLEBULKTESTを実行します。専用の未保存テストブックで、文字列の先頭ゼロ・数式化防止・数量と電力の数値型・空欄・1,001台の500行境界・減少時の古い値消去・枠をまたぐ結合の拒否・計算モード復元・COM解放を確認します。実案件の図面とExcelは変更しません。
 
 案件コピーの保存後はPython/openpyxlで独立に読み直し、旧コードとL3の全シートのセル値・数式、結合範囲、印刷範囲が一致することを確認しました。更新対象以外のシートの値・数式は原本コピーと一致しました。共有原本は変更していません。通常AutoCADでの実DWG収集から保存までの対話操作は、今回の自動試験に含みません。

@@ -8,7 +8,7 @@ import shutil
 sys.stdout.reconfigure(encoding='utf-8', errors='replace')
 
 ROOT = Path(__file__).resolve().parent
-for name in ('garari_table.lsp', 'GARARITABLE_tests.lsp'):
+for name in ('12_garari_table.lsp', '13_diagnostics_tests.lsp'):
     text = (ROOT / name).read_text(encoding='utf-8-sig')
     depth = 0
     quoted = escaped = comment = False
@@ -58,7 +58,7 @@ if '--core' in sys.argv:
     core = Path(r'C:\Program Files\Autodesk\AutoCAD 2026\accoreconsole.exe')
     with tempfile.TemporaryDirectory(prefix='garari-check-', ignore_cleanup_errors=True) as tmp:
         directory = Path(tmp)
-        for name in ('garari_table.lsp', 'GARARITABLE_tests.lsp', 'garari_master.csv', 'room_master.csv'):
+        for name in ('12_garari_table.lsp', '13_diagnostics_tests.lsp', 'garari_master.csv', 'room_master.csv'):
             shutil.copy2(ROOT / name, directory / name)
         base = directory.as_posix()
         script = directory / 'test.scr'
@@ -66,9 +66,9 @@ if '--core' in sys.argv:
             '(princ (strcat "LISPSYS=" (itoa (getvar "LISPSYS"))))\n'
             f'(setq garari:test-trusted (getvar "TRUSTEDPATHS"))\n'
             f'(setvar "TRUSTEDPATHS" "{base}")\n'
-            f'(load "{base}/garari_table.lsp")\n'
+            f'(load "{base}/12_garari_table.lsp")\n'
             f'(setq garari:directory "{base}")\n'
-            f'(load "{base}/GARARITABLE_tests.lsp")\n'
+            f'(load "{base}/13_diagnostics_tests.lsp")\n'
             'GARARITABLETEST\nGARARITABLECOMTEST\n(setvar "TRUSTEDPATHS" garari:test-trusted)\n_QUIT\n_Y\n', encoding='ascii')
         result = subprocess.run([str(core), '/s', str(script), '/l', 'en-US',
                                  '/isolate', 'GARARI_TEST', str(directory / 'profile')],
