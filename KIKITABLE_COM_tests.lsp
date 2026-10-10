@@ -83,7 +83,7 @@
   (ktt:assert (= (kt:cell-value raw 1 1) "SYSTEM") "Raw headers")
   (ktt:assert (= (kt:cell-value raw 6 3) "PAC-10") "Every block and derived key in raw")
   (ktt:assert (= (kt:cell-value raw 6 2) "10") "Raw number retained")
-  (ktt:assert (= (kt:cell-value ws 13 3) "空　調　機") "Saved fixed name")
+  (ktt:assert (= (kt:cell-value ws 13 3) (kt:cfg 'equipment-name)) "Saved configured equipment name")
   (ktt:assert (= (kt:cell-value ws 13 7) "3") "Saved phase without phi")
   (ktt:assert (= (kt:cell-value ws 18 5) "ワイヤードリモコン、その他付属品一式") "Saved remote sentence")
   (ktt:assert (= (kt:cell-value raw 2 (1+ (vl-position "FREQ" kt:raw-tags))) "50") "Raw frequency")

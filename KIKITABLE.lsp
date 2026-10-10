@@ -67,6 +67,12 @@
   ;; 画面がCOM待ちで更新されなくても直前の工程を残す。毎回closeして確定する。
   (vl-catch-all-apply 'kt:trace-write (list message))
   (princ (strcat "\nKIKITABLE：" message)) (princ))
+(defun kt:timed (label function args / started result)
+  (kt:trace (strcat label "開始"))
+  (setq started (getvar "MILLISECS") result (apply function args))
+  (kt:trace (strcat label "完了 / "
+    (rtos (/ (- (getvar "MILLISECS") started) 1000.0) 2 3) "秒"))
+  result)
 (defun kt:join (items sep / out s)
   (setq out "")
   (foreach s items (if (/= s "") (setq out (if (= out "") s (strcat out sep s))))) out)
@@ -101,7 +107,8 @@
       (setq result (vl-catch-all-apply 'vlax-invoke-method (list kt:excel 'Quit)))
       (if (vl-catch-all-error-p result) (princ "\n警告：専用Excelを終了できませんでした。"))
       (vl-catch-all-apply 'vlax-release-object (list kt:excel))))
-  (setq kt:excel nil) (gc))
+  ;; COM参照は上で明示解放済み。Excel終了直後の強制GCは行わない。
+  (setq kt:excel nil))
 (defun kt:col (n / s)
   (setq s "")
   (while (> n 0)
@@ -142,6 +149,40 @@
       ;; NumberFormatは変えず、台数と最大電力は数値のまま書き込む。
       (vlax-put-property cell 'Value2 (if (= (type value) 'STR) (strcat "'" value) value))
       (kt:drop cell))))
+
+(defun kt:excel-value (value)
+  ;; 空欄は空欄、文字列はリテラル、台数・電力は数値を維持する。
+  (if (= (type value) 'STR)
+    (if (= value "") "" (strcat "'" value)) value))
+(defun kt:put-matrix (ws row col matrix / area array height width)
+  (if matrix
+    (progn
+      (setq height (length matrix) width (length (car matrix))
+            array (vlax-make-safearray vlax-vbVariant (cons 1 height) (cons 1 width)))
+      (vlax-safearray-fill array
+        (mapcar '(lambda (values) (mapcar 'kt:excel-value values)) matrix))
+      (setq kt:cell-context (kt:address row col)
+            area (kt:range ws row col (+ row height -1) (+ col width -1)))
+      (vlax-put-property area 'Value2 (vlax-make-variant array))
+      (kt:drop area))))
+(defun kt:write-plan (ws plan / item bottom right area merged array)
+  ;; 結合なし帳票は一括転記。結合ありは従来の左上セル検査を維持する。
+  (if plan
+    (progn
+      (setq bottom (kt:cfg 'start-row) right 2)
+      (foreach item plan (setq bottom (max bottom (car item)) right (max right (cadr item))))
+      (setq area (kt:range ws (kt:cfg 'start-row) 2 bottom right)
+            merged (kt:unwrap (vlax-get-property area 'MergeCells)))
+      (if (equal merged :vlax-false)
+        (progn
+          (setq array (vlax-make-safearray vlax-vbVariant
+            (cons (kt:cfg 'start-row) bottom) (cons 2 right)))
+          (foreach item plan
+            (vlax-safearray-put-element array (car item) (cadr item) (kt:excel-value (caddr item))))
+          (setq kt:cell-context (kt:address (kt:cfg 'start-row) 2))
+          (vlax-put-property area 'Value2 (vlax-make-variant array)))
+        (foreach item plan (kt:put ws (car item) (cadr item) (caddr item))))
+      (kt:drop area))))
 
 ;; -------- 自然順ソートと数値判定（図面単位設定に依存させない） --------
 (defun kt:digit (s) (and (= (strlen s) 1) (<= 48 (ascii s) 57)))
@@ -384,6 +425,7 @@
   (vlax-put-property kt:excel 'Visible :vlax-false)
   (vlax-put-property kt:excel 'DisplayAlerts :vlax-false)
   (vlax-put-property kt:excel 'EnableEvents :vlax-false)
+  (vlax-put-property kt:excel 'ScreenUpdating :vlax-false)
   (vlax-put-property kt:excel 'AutomationSecurity 3)
   (setq books (kt:own (vlax-get-property kt:excel 'Workbooks)))
   ;; UpdateLinks=0 / ReadOnly=False / Password="" / Notify=False。
@@ -426,9 +468,15 @@
   (list (reverse floors) quantity note-col))
 
 ;; -------- 書式展開・出力：既存セルの書式を維持して内容だけを更新 --------
-(defun kt:check-boundary (ws end col / r c cell merge rows columns bottom right)
+(defun kt:check-boundary (ws end col / r c cell merge rows columns bottom right area merged)
   ;; ヘッダーや領域外に及ぶ結合セルをClearContentsで壊さない。
   (setq r (kt:cfg 'start-row))
+  ;; 範囲全体が結合なしなら、セルごとのCOM照会は不要。
+  ;; 混在時のNullも結合ありとして扱い、従来の厳密な境界検査へ進む。
+  (setq area (kt:range ws r 2 end col)
+        merged (kt:unwrap (vlax-get-property area 'MergeCells)))
+  (kt:drop area)
+  (if (equal merged :vlax-false) (setq r (1+ end)))
   (while (<= r end)
     (setq c 2)
     (while (<= c col)
@@ -493,19 +541,35 @@
           (strcat (kt:address top left) ":" (kt:address (max end bottom) (max lastcol right)))))
       (kt:drop columns) (kt:drop rows) (kt:drop areas) (kt:drop area)))
   (kt:drop setup))
-(defun kt:write-raw (ws records / row col tag record end width)
+(defun kt:write-raw (ws records / row col tag record end width area merged chunk)
   (setq end (max (kt:last ws 'Row) (1+ (length records)))
         width (max (kt:last ws 'Column) (length kt:raw-tags)))
   (kt:clear ws 1 1 end width)
-  (setq col 1)
-  (foreach tag kt:raw-tags (kt:put ws 1 col tag) (setq col (1+ col)))
-  (setq row 2)
-  (foreach record records
-    (setq record (kt:derive record))
-    (setq col 1)
-    (foreach tag kt:raw-tags
-      (kt:put ws row col (kt:get record tag)) (setq col (1+ col)))
-    (setq row (1+ row))))
+  (setq area (kt:range ws 1 1 (1+ (length records)) (length kt:raw-tags))
+        merged (kt:unwrap (vlax-get-property area 'MergeCells)))
+  (kt:drop area)
+  (if (equal merged :vlax-false)
+    (progn
+      ;; 500行ずつ書くため、台数が増えてもCOM往復数はセル数に比例しない。
+      (setq row 1 chunk (list kt:raw-tags))
+      (foreach record records
+        (setq record (kt:derive record)
+              chunk (cons (mapcar '(lambda (tag) (kt:get record tag)) kt:raw-tags) chunk))
+        (if (>= (length chunk) 500)
+          (progn
+            (kt:put-matrix ws row 1 (reverse chunk))
+            (setq row (+ row (length chunk)) chunk nil))))
+      (kt:put-matrix ws row 1 (reverse chunk)))
+    (progn
+      (setq col 1)
+      (foreach tag kt:raw-tags (kt:put ws 1 col tag) (setq col (1+ col)))
+      (setq row 2)
+      (foreach record records
+        (setq record (kt:derive record))
+        (setq col 1)
+        (foreach tag kt:raw-tags
+          (kt:put ws row col (kt:get record tag)) (setq col (1+ col)))
+        (setq row (1+ row))))))
 (defun kt:write-aircon-book (records groups / sheets ws raw headers floors quantity note-col index group oldend newend end item limit)
   (setq sheets (kt:own (vlax-get-property kt:book 'Worksheets))
         ws (kt:sheet sheets (kt:cfg 'sheet)))
@@ -521,19 +585,19 @@
       (if (> newend limit) (kt:fail "機器数が設定data-end-rowの出力領域を超えます。"))
       (setq oldend limit)))
   (setq end (max oldend newend))
-  (kt:check-boundary ws end note-col)
+  (kt:timed "結合セル境界検査" 'kt:check-boundary (list ws end note-col))
   (setq kt:stage "帳票書式の展開")
-  (kt:extend ws oldend newend note-col)
+  (kt:timed "帳票書式展開" 'kt:extend (list ws oldend newend note-col))
   (kt:clear ws (kt:cfg 'start-row) 2 end note-col)
   (setq kt:stage "完成機器表の書込み")
-  (foreach item (reverse kt:plan) (kt:put ws (car item) (cadr item) (caddr item)))
+  (kt:timed "完成機器表書込み" 'kt:write-plan (list ws (reverse kt:plan)))
   (kt:print-area ws newend note-col)
   (setq kt:stage "CAD_DATAの書込み" raw (kt:sheet sheets (kt:cfg 'raw-sheet)))
   (if (null raw)
     (progn
       (setq raw (kt:own (vlax-invoke-method sheets 'Add)))
       (vlax-put-property raw 'Name (kt:cfg 'raw-sheet))))
-  (kt:write-raw raw records))
+  (kt:timed "CAD_DATA書込み" 'kt:write-raw (list raw records)))
 ;; -------- 換気：可変行の配置計画と専用の書式展開 --------
 (defun kt:vent-part (data tag suffix / value)
   (setq value (kt:get data tag))
@@ -627,7 +691,7 @@
       (if (and value (not (equal value ""))) (setq blank nil)))
     (if blank (setq found row)) (setq row (1+ row)))
   (if (not found) (kt:fail "換気表の区切り空行がありません。テンプレートを確認してください。")) found)
-(defun kt:write-vent-book (records groups / sheets ws raw headers floors quantity note-col oldend newend layout layouts temp area item row height i spacer)
+(defun kt:write-vent-book (records groups / sheets ws raw headers floors quantity note-col oldend newend layout layouts temp area item row height i spacer started)
   (setq sheets (kt:own (vlax-get-property kt:book 'Worksheets)) ws (kt:sheet sheets (kt:cfg 'sheet)))
   (if (null ws) (kt:fail (strcat "シートが存在しません：" (kt:cfg 'sheet))))
   (setq headers (kt:headers ws) floors (car headers) quantity (cadr headers) note-col (caddr headers)
@@ -636,6 +700,7 @@
   (kt:vent-check-merge ws oldend note-col)
   (setq spacer (kt:vent-spacer ws oldend note-col))
   (setq kt:stage "換気表の可変行・書式展開")
+  (kt:trace "換気表書式展開開始") (setq started (getvar "MILLISECS"))
   ;; 先頭・明細・空行の書式を一時シートへ退避。正常時は保存前に削除する。
   ;; エラー時はブックを保存しない既存ハンドラに任せる。
   (setq temp (kt:own (vlax-invoke-method sheets 'Add)))
@@ -656,20 +721,29 @@
       (setq i (1+ i)))
     (repeat (kt:cfg 'vent-gap)
       (kt:vent-copy-row temp 3 ws (+ row i) note-col) (setq i (1+ i))))
+  (kt:trace (strcat "換気表書式展開完了 / "
+    (rtos (/ (- (getvar "MILLISECS") started) 1000.0) 2 3) "秒"))
   (kt:clear ws (kt:cfg 'start-row) 2 newend note-col)
   (setq kt:stage "換気表の書込み")
-  (foreach item (reverse kt:plan) (kt:put ws (car item) (cadr item) (caddr item)))
+  (kt:timed "換気機器表書込み" 'kt:write-plan (list ws (reverse kt:plan)))
   (kt:print-area ws newend note-col)
   (vlax-invoke-method temp 'Delete) (kt:drop temp)
   (setq raw (kt:sheet sheets (kt:cfg 'raw-sheet)))
   (if (null raw)
     (progn (setq raw (kt:own (vlax-invoke-method sheets 'Add)))
            (vlax-put-property raw 'Name (kt:cfg 'raw-sheet))))
-  (kt:write-raw raw records))
-(defun kt:write-book (records groups)
+  (setq kt:stage "CAD_DATA_KANKIの書込み")
+  (kt:timed "CAD_DATA_KANKI書込み" 'kt:write-raw (list raw records)))
+(defun kt:write-book (records groups / calculation result)
+  ;; セル書込み・行コピーのたびに他シートの数式を再計算しない。
+  ;; 専用Excelだけを変更し、成功時は保存前に元の計算モードへ戻す。
+  (setq calculation (kt:unwrap (vlax-get-property kt:excel 'Calculation)))
+  (vlax-put-property kt:excel 'Calculation -4135)
   (if (= (kt:cfg 'category) "KANKI")
-    (kt:write-vent-book records groups)
-    (kt:write-aircon-book records groups)))
+    (setq result (kt:write-vent-book records groups))
+    (setq result (kt:write-aircon-book records groups)))
+  (kt:timed "Excel計算設定の復元" 'vlax-put-property (list kt:excel 'Calculation calculation))
+  result)
 (defun kt:show-warnings (/ s)
   (princ (strcat "\n警告：" (itoa (length kt:warnings)) "件"))
   (foreach s (reverse kt:warnings) (princ (strcat "\n・" s))))
@@ -710,7 +784,7 @@
         kt:config (if (= category "KANKI") (append kt:vent-config kt:aircon-config) kt:aircon-config)
         kt:tags (if (= category "KANKI") kt:vent-tags kt:aircon-tags))
   (setq kt:log-path (vl-filename-mktemp "KIKITABLE-diagnostic-" (getenv "TEMP") ".log"))
-  (princ (strcat "\nKIKITABLE L2（既存Excel照会なし） / ログ：" kt:log-path))
+  (princ (strcat "\nKIKITABLE L3（範囲単位書込み） / ログ：" kt:log-path))
   (kt:trace "START")
   (setq kt:stage "図面属性の収集" kt:raw-tags (kt:raw-columns) records (kt:collect))
   (if (null records)
@@ -742,5 +816,5 @@
         (princ "\nキャンセルしました。"))))
   (kt:cleanup) (princ))
 
-(princ "\nKIKITABLE L2（既存Excel照会なし）loaded. Command: KIKITABLE")
+(princ "\nKIKITABLE L3（範囲単位書込み）loaded. Command: KIKITABLE")
 (princ)
