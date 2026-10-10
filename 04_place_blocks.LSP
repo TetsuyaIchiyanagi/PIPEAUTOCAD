@@ -760,9 +760,9 @@
                 )
 
                 (partSs
-                  (setq pa-debug-step "convert double blocks without pipe-size text")
-                  (princ "\n[DBG INSERTPIPEPARTS] double-line drain mode has no pipe-size TEXT; convert selected blocks only")
-                  (pa-convert-double-blocks partSs nil)
+                  (setq pa-debug-step "convert double pipe with default size")
+                  (princ "\n[DBG INSERTPIPEPARTS] double-line drain mode has no pipe-size TEXT; use default dia=100")
+                  (pa-convert-double-pipe-run-default-dia lineSs partSs 100.0)
                 )
 
                 (T

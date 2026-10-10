@@ -1526,6 +1526,31 @@
   count
 )
 
+(defun pa-apply-default-pipe-size (segs defaultSize / result seg size)
+  (setq result '())
+
+  (foreach seg segs
+    (setq size (nth 2 seg))
+    (if (or (null size) (= size "") (<= (atof size) 0.0))
+      (setq
+        result
+        (cons
+          (list
+            (nth 0 seg)
+            (nth 1 seg)
+            defaultSize
+            (nth 3 seg)
+          )
+          result
+        )
+      )
+      (setq result (cons seg result))
+    )
+  )
+
+  (reverse result)
+)
+
 (defun pa-convert-double-pipe-run (lineSs textSs blockSs / segs nodeSizes)
   (if (and lineSs textSs)
     (progn
@@ -1559,6 +1584,49 @@
   )
 
   (if (and lineSs textSs) T nil)
+)
+
+(defun pa-convert-double-pipe-run-default-dia (lineSs blockSs defaultDia / segs nodeSizes defaultSize)
+  (if lineSs
+    (progn
+      (setq defaultSize (pa-format-dia defaultDia))
+      (setq segs (pa-build-pipe-segments lineSs nil))
+      (setq segs (pa-apply-default-pipe-size segs defaultSize))
+      (princ
+        (strcat
+          "\n[DBG INSERTPIPEPARTS DOUBLE] no pipe-size TEXT; default dia="
+          defaultSize
+        )
+      )
+      (princ
+        (strcat
+          "\n[DBG INSERTPIPEPARTS DOUBLE] segment count: "
+          (itoa (length segs))
+        )
+      )
+
+      (setq nodeSizes (pa-build-node-sizes segs))
+      (princ
+        (strcat
+          "\n[DBG INSERTPIPEPARTS DOUBLE] node dia count: "
+          (itoa (length nodeSizes))
+        )
+      )
+
+      (if blockSs
+        (pa-convert-double-blocks blockSs nodeSizes)
+        (princ "\n[DBG INSERTPIPEPARTS DOUBLE] no blocks selected")
+      )
+
+      (pa-draw-double-pipe-segments segs)
+      (pa-delete-line-ss lineSs)
+
+      (princ "\n[DBG INSERTPIPEPARTS] double-line conversion done")
+    )
+    (princ "\nSelect LINE.")
+  )
+
+  (if lineSs T nil)
 )
 
 (defun pa-obsolete-doublepipe-command (/ ss lineSs textSs segs seg p1 p2 size lineLayer dia offset count skipped)
