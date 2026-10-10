@@ -4,11 +4,11 @@
 
 ## 導入・操作
 
-1. `12_garari_table.lsp`、`garari_master.csv`、`room_master.csv` を同じフォルダに配置。
-2. Windows版AutoCADフル版2021以降とデスクトップExcelを使用。LISPはUTF-8、CSVはUTF-8 BOM付きです。`LISPSYS` が0なら、利用者が1または2へ設定しAutoCADを再起動してください。モジュールはシステム変数を変更しません。
+1. `12_garari_table.lsp`と`機器マスター_空調.xlsx`を同じフォルダに配置。
+2. Windows版AutoCADフル版2021以降とデスクトップExcelを使用。LISPはUTF-8です。`LISPSYS`が0なら、利用者が1または2へ設定しAutoCADを再起動してください。モジュールはシステム変数を変更しません。
 3. APPLOADで `main.LSP` または `12_garari_table.lsp` をロード。必要なら利用者がこのフォルダを信頼済みパス・サポート検索パスに登録してください。SECURELOADを下げる必要はありません。
 4. `GARARITABLE` を実行。案件FD温度（既定72℃）、屋外網目（既定10メッシュ）、SOUNDタグ欠落時の防音指定（既定なし）を確認します。
-5. 屋外・室内のマスターは前回の指定先から自動読込します（AutoCAD再起動後も記憶）。初回、または記憶したファイルがない場合はLISPと同じフォルダのCSVを使用し、そこにもない場合だけ選択画面を表示します。使用パスはコマンド画面と選定設定シートに記載します。指定先を変更するときは `GARARIMASTERSET` を実行してください。2ファイルの読込成功後に履歴を更新し、変更中のキャンセルでは前回の指定を保持します。CSVの内容は毎回読み直すため、マスター編集は次回実行に反映されます。
+5. 同じフォルダの`機器マスター_空調.xlsx`を自動読込みします。屋外は`GARARI_MASTER`、室内給気口は`ROOM_MASTER`です。旧CSV指定履歴は使用せず、別ファイルの選択画面も表示しません。マスターの保存済み内容を毎回読み直し、読取り専用で開いて閉じます。使用パスとシート名はコマンド画面・出力の選定設定シートに記載します。`GARARIMASTERSET`は統合マスターの検証・件数表示コマンドとして維持しています。
 6. `1F` 等の階名を入力し、設備を範囲選択します。次の階を追加し、階名入力でEnterを押して選択を終了します。FLOOR属性があればそれを優先し、選択階との相違を警告します。
 7. 件数を確認して新規 `.xlsx` 保存先を指定。既存ファイルは別名を求めます。保存後に専用Excelで結果を表示します。
 
@@ -46,9 +46,9 @@ ROOM実品番は半角英数字・大文字へ正規化して照合し、ハイ�
 
 ## マスター保守・帳票設定
 
-ExcelでCSV UTF-8（BOM付き）として保存してください。セル内改行は禁止。引用符・カンマ・二重引用符はパーサーが処理します。必須列欠落・列重複・APPROVED不正・キー重複を検出します。キー値は正規形（径100、あり／なし、深型／平型等）で入力してください。
+`機器マスター_空調.xlsx`の対象シートを編集して保存してください。1行目は英語キー、2行目は日本語見出し、3行目以降が機器データです。列の追加・並べ替えに対応し、MODELが空欄の行は除外します。必須列欠落・列重複・APPROVED不正・キー重複を検出します。キー値は正規形（径100、あり／なし、深型／平型等）で入力してください。
 
-`garari_master.csv` のキー列はSHAPE,DIA,FD,MATERIAL,MESH,MESH_SPEC,FD_TEMP,SOUND。FDなしのFD_TEMP、網なしのMESH_SPECは空欄。MANUFACTURER,MODEL,SPEC_NOTE,APPROVED,SOURCE_URL,CHECKED_DATEも必要です。`room_master.csv` はMODEL,MANUFACTURER,DIA,SPEC_NOTE,APPROVED,SOURCE_URL,CHECKED_DATE。ROOMのMODELは一意にします。確認していない候補はAPPROVED=0、承認済み品だけ1にしてください。
+`GARARI_MASTER`のキー列はSHAPE,DIA,FD,MATERIAL,MESH,MESH_SPEC,FD_TEMP,SOUND。FDなしのFD_TEMP、網なしのMESH_SPECは空欄。MANUFACTURER,MODEL,SPEC_NOTE,APPROVED,SOURCE_URL,CHECKED_DATEも必要です。`ROOM_MASTER`はMODEL,MANUFACTURER,DIA,SPEC_NOTE,APPROVED,SOURCE_URL,CHECKED_DATE。ROOMのMODELは一意にします。径・網目・温度・APPROVEDはExcelの数値セルでも扱えます。確認していない候補はAPPROVED=0、承認済み品だけ1にしてください。
 
 メーカーの枝系統を変える場合は完全な実在品番をマスターへ登録して切り替えます。同一キーの承認行を複数残さないでください。登録のAPPROVEDは属性仕様の照合を意味し、販売継続・設計性能・法規適合を保証しません。
 
@@ -63,7 +63,13 @@ ExcelでCSV UTF-8（BOM付き）として保存してください。セル内改
 
 新規Excel Applicationのみを所有し、既存Excelに接続しません。一時ファイルへ保存し、ブックを閉じてから上書きなしのリネームで確定。失敗・Escでは専用ブックと専用Excelを終了して参照を解放します。正常時は表示ブックを利用者へ渡し、参照だけを解放します。
 
-## 検証結果（2026-10-03）
+## 統合と検証（2026-10-11）
+
+既存CSVの屋外27件・室内1件はExcel内のマスターシートと一致しており、重複登録せず既存シートを使用しました。旧検証Excelの4シートは`検証_`を付けて保存し、旧検証CSVの16ケースは`GARARI_TEST_CASES`へ統合しました。元のExcel・CSVは削除しています。検証シートは機種選定には使用しません。
+
+CSVを置かない隔離フォルダで全モジュールを読み込み、統合Excelの実読込みを含む221項目の回帰テストが成功しました。新規の`GARARIMASTERTEST`12項目では、数値セル・空欄・見出し2行・列並べ替え・列欠落・重複列・不正APPROVED・データなし・ファイル欠落と解放を検証しました。CADの対話操作と帳票の書込みは今回の検証対象に含めていません。
+
+## 旧仕様での検証結果（2026-10-03）
 
 AutoCAD 2026 Core Consoleを分離プロファイルで実行、LISPSYS=1。独立したExcel COMで実際にxlsxを作成・再オープンし、Python/openpyxlで内容を確認しました。
 
@@ -73,9 +79,9 @@ AutoCAD 2026 Core Consoleを分離プロファイルで実行、LISPSYS=1。独�
 - Kの実ブロック属性抽出（非表示・定数・ダイナミック）、Lの範囲再選択、QのExcel未導入・保存先使用中・Esc、Rの印刷プレビューは未完了。Core Consoleでは図面エンティティのActiveX取得が利用できず、抽出試験を実機合格とはしていません。通常のAutoCAD画面で検証してください。
 - AutoCAD 2021～2025、巨大図面、多ページ印刷、長い日本語の見切れも未実機検証。行高・改ページは設定済みですが、実プリンターの印刷プレビューを確認してください。
 
-`GARARITABLE_acceptance.xlsx` は実出力の検証サンプル（実案件データではありません）。`GARARITABLE_core_test.log` は最終実行ログ。`GARARITABLE_acceptance.csv` に属性例と期待値を収録しています。
+当時の実出力サンプル・属性例と期待値は、現在は統合Excelの検証シートに保存しています。
 
-再検証は `garari_verify.py`（静的検査）、`garari_verify.py --core`（AutoCAD 2026＋Excelによる独立検証）で行います。--coreは専用の分離プロファイルに検証フォルダだけを信頼登録し、終了時に戻します。本体は信頼設定を変更しません。Pythonにはopenpyxlが必要です。
+再検証は`garari_verify.py`（LISP構文・統合Excelのマスター列とキーの検査）、`garari_verify.py --core`（AutoCAD 2026＋Excelによる独立検証）で行います。--coreは統合Excelのコピーを使用し、検証出力・ログは一時フォルダだけに作成します。専用の分離プロファイルに検証フォルダだけを信頼登録し、終了時に戻します。本体は信頼設定を変更しません。Pythonにはopenpyxlが必要です。
 
 通常のAutoCADで `13_diagnostics_tests.lsp` を読み込む場合、`GARARITABLETEST` は図面・Excelを変更しません。`GARARITABLECOMTEST` はモジュール所在に検証Excelを作ります。`GARARITABLECADTEST` は使い捨ての新規DWGだけで実行（GARARIブロックを作成します）。試験DWGは保存しないでください。
 
