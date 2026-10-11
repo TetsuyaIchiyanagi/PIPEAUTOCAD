@@ -21,7 +21,7 @@
     ((and (boundp '*load-pathname*) *load-pathname*)
       (vl-filename-directory *load-pathname*))
     ((and (boundp 'pa-path) pa-path) pa-path)
-    ((findfile "10_kikiset.lsp") (vl-filename-directory (findfile "10_kikiset.lsp")))))
+    ((findfile "06_kikiset.lsp") (vl-filename-directory (findfile "06_kikiset.lsp")))))
 (setq ks:master-source
   (if ks:source-directory
     (strcat (vl-string-right-trim "/\\" ks:source-directory) "/機器マスター_空調.xlsx")))
@@ -209,10 +209,10 @@
 
 (defun ks:file ()
   (if (null ks:master-source)
-    (ks:fail "KIKISETのフォルダを特定できません。main.LSPまたは10_kikiset.lspを再読込みしてください。"))
+    (ks:fail "KIKISETのフォルダを特定できません。main.LSPまたは06_kikiset.lspを再読込みしてください。"))
   (if (not (findfile ks:master-source))
     (ks:fail (strcat "機器マスターが存在しません：" ks:master-source
-      "\n10_kikiset.lspと同じフォルダに機器マスター_空調.xlsxを配置してください。")))
+      "\n06_kikiset.lspと同じフォルダに機器マスター_空調.xlsxを配置してください。")))
   ks:master-source)
 (defun ks:download-master (url / http stream result body bytes download-url)
   (ks:trace "DOWNLOAD BEGIN / WINHTTP CREATE")

@@ -45,16 +45,16 @@
   (and
     dir
     (or
-      (pa:file-exists-p (strcat dir "01_intersection.LSP"))
-      (pa:file-exists-p (strcat dir "01_intersection.lsp"))
+      (pa:file-exists-p (strcat dir "01_pipe_geometry.LSP"))
+      (pa:file-exists-p (strcat dir "01_pipe_geometry.lsp"))
     )
     (or
-      (pa:file-exists-p (strcat dir "07_duct_double_line.LSP"))
-      (pa:file-exists-p (strcat dir "07_duct_double_line.lsp"))
+      (pa:file-exists-p (strcat dir "03_pipe_duct_double_line.LSP"))
+      (pa:file-exists-p (strcat dir "03_pipe_duct_double_line.lsp"))
     )
     (or
-      (pa:file-exists-p (strcat dir "08_mep_cross_cut.LSP"))
-      (pa:file-exists-p (strcat dir "08_mep_cross_cut.lsp"))
+      (pa:file-exists-p (strcat dir "04_mep_cross_cut.LSP"))
+      (pa:file-exists-p (strcat dir "04_mep_cross_cut.lsp"))
     )
   )
 )
@@ -193,7 +193,7 @@
   (cond
     ((and (boundp '*load-truename*) *load-truename*) *load-truename*)
     ((and (boundp '*load-pathname*) *load-pathname*) *load-pathname*)
-    ((pa:safe-findfile "01_intersection.lsp"))
+    ((pa:safe-findfile "01_pipe_geometry.lsp"))
   )
 )
 
@@ -208,19 +208,14 @@
 
 (if pa-path
   (progn
-    (load (strcat pa-path "01_intersection.lsp"))
-    (load (strcat pa-path "02_node_classify.lsp"))
-    (load (strcat pa-path "03_direction.lsp"))
-    (load (strcat pa-path "04_place_blocks.lsp"))
-    (load (strcat pa-path "05_pipe_size_text.lsp"))
-    (load (strcat pa-path "06_double_line.lsp"))
-    (load (strcat pa-path "07_duct_double_line.lsp"))
-    (load (strcat pa-path "08_mep_cross_cut.lsp"))
-    (load (strcat pa-path "09_detail_cut.lsp"))
-    (load (strcat pa-path "10_kikiset.lsp"))
-    (load (strcat pa-path "11_kikitable.lsp"))
-    (load (strcat pa-path "12_garari_table.lsp"))
-    ;; Optional diagnostics/tests: APPLOAD 13_diagnostics_tests.lsp separately.
+    (load (strcat pa-path "01_pipe_geometry.lsp"))
+    (load (strcat pa-path "02_pipe_commands.lsp"))
+    (load (strcat pa-path "03_pipe_duct_double_line.lsp"))
+    (load (strcat pa-path "04_mep_cross_cut.lsp"))
+    (load (strcat pa-path "05_detail_cut.lsp"))
+    (load (strcat pa-path "06_kikiset.lsp"))
+    (load (strcat pa-path "07_kikitable.lsp"))
+    (load (strcat pa-path "08_garari_table.lsp"))
 
     (princ "\nPipeAutoCAD loaded.")
     (princ (strcat "\nPipeAutoCAD path: " pa-path))

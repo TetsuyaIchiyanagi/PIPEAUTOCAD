@@ -4,9 +4,9 @@
 
 ## 導入・操作
 
-1. `12_garari_table.lsp`と`機器マスター_空調.xlsx`を同じフォルダに配置。
+1. `08_garari_table.lsp`と`機器マスター_空調.xlsx`を同じフォルダに配置。
 2. Windows版AutoCADフル版2021以降とデスクトップExcelを使用。LISPはUTF-8です。`LISPSYS`が0なら、利用者が1または2へ設定しAutoCADを再起動してください。モジュールはシステム変数を変更しません。
-3. APPLOADで `main.LSP` または `12_garari_table.lsp` をロード。必要なら利用者がこのフォルダを信頼済みパス・サポート検索パスに登録してください。SECURELOADを下げる必要はありません。
+3. APPLOADで `main.LSP` または `08_garari_table.lsp` をロード。必要なら利用者がこのフォルダを信頼済みパス・サポート検索パスに登録してください。SECURELOADを下げる必要はありません。
 4. `GARARITABLE` を実行。案件FD温度（既定72℃）、屋外網目（既定10メッシュ）、SOUNDタグ欠落時の防音指定（既定なし）を確認します。
 5. 同じフォルダの`機器マスター_空調.xlsx`を自動読込みします。屋外は`GARARI_MASTER`、室内給気口は`ROOM_MASTER`です。旧CSV指定履歴は使用せず、別ファイルの選択画面も表示しません。マスターの保存済み内容を毎回読み直し、読取り専用で開いて閉じます。使用パスとシート名はコマンド画面・出力の選定設定シートに記載します。`GARARIMASTERSET`は統合マスターの検証・件数表示コマンドとして維持しています。
 6. `1F` 等の階名を入力し、設備を範囲選択します。次の階を追加し、階名入力でEnterを押して選択を終了します。FLOOR属性があればそれを優先し、選択階との相違を警告します。
@@ -81,8 +81,6 @@ AutoCAD 2026 Core Consoleを分離プロファイルで実行、LISPSYS=1。独�
 
 当時の実出力サンプル・属性例と期待値は、現在は統合Excelの検証シートに保存しています。
 
-再検証は`garari_verify.py`（LISP構文・統合Excelのマスター列とキーの検査）、`garari_verify.py --core`（AutoCAD 2026＋Excelによる独立検証）で行います。--coreは統合Excelのコピーを使用し、検証出力・ログは一時フォルダだけに作成します。専用の分離プロファイルに検証フォルダだけを信頼登録し、終了時に戻します。本体は信頼設定を変更しません。Pythonにはopenpyxlが必要です。
-
-通常のAutoCADで `13_diagnostics_tests.lsp` を読み込む場合、`GARARITABLETEST` は図面・Excelを変更しません。`GARARITABLECOMTEST` はモジュール所在に検証Excelを作ります。`GARARITABLECADTEST` は使い捨ての新規DWGだけで実行（GARARIブロックを作成します）。試験DWGは保存しないでください。
+再検証は`garari_verify.py`（LISP構文・統合Excelのマスター列とキーの検査）で行います。Pythonにはopenpyxlが必要です。
 
 一次資料のURL・確認日はマスター各行に記録しました。未登録UNIX条件と、使用予定の追加室内品番は一次資料で確認してからマスターへ追加してください。
