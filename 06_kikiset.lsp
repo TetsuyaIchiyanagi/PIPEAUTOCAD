@@ -1,6 +1,9 @@
 ;; KIKISET - standalone Windows AutoCAD Visual LISP / Excel COM.
 ;; UTF-8: use Unicode AutoLISP (LISPSYS=1 or 2). See KIKISET.md.
 (vl-load-com)
+(setq ks:version "2026-10-30.2")
+(defun ks:progress (message)
+  (setq ks:stage message) (princ (strcat "\nKIKISET：" message)) (ks:trace message))
 ;; 診断時のみ、各操作の直前・直後を閉じたログファイルへ記録する。
 ;; COM呼出しが応答しない場合も、最後に開始した処理がディスクに残る。
 (defun ks:trace (message / f result)
@@ -48,7 +51,8 @@
     (if (not (member answer '(1 2))) (princ "\n1（空調）または2（換気）を入力してください。")))
   (princ (if (= answer 2) "\n選択カテゴリ：換気（KANKI_KIKI）" "\n選択カテゴリ：空調（KUCHO_KIKI）"))
   (if (= answer 2) "KANKI" "KUCHO"))
-(setq ks:protected '("SYSTEM" "NUM" "LOCATION" "FLOOR" "KIKI_NO"))
+(setq ks:protected '("SYSTEM" "NUM" "LOCATION" "FLOOR" "FLOOR_AREA" "CEILING_HEIGHT" "KIKI_NO"
+  "HUMAN" "KANKIRYOU" "KANKIKAISUU" "CICKHOUSE" "CIQKHOUSE" "KANKIHOUSIKI"))
 (setq ks:selection-steps
   '(("MAKER" . "メーカー") ("UNIT_TYPE" . "室内機タイプ")
     ("SYSTEM_CONFIG" . "システム構成") ("CAPACITY_CLASS" . "能力クラス")))
@@ -107,14 +111,21 @@
 (defun ks:close-excel (/ o r)
   (ks:trace "CLEANUP BEGIN")
   ;; Only objects created by this command are owned. Never GetObject.
+  (if ks:excel
+    (vl-catch-all-apply 'vlax-put-property (list ks:excel 'DisplayAlerts :vlax-false)))
+  (foreach o ks:objects
+    (if (and (not (eq o ks:book)) (not (eq o ks:excel))) (ks:release o)))
+  (setq ks:objects nil)
   (if ks:book
     (progn
+      (ks:progress "専用Excelブックを閉じる")
       (setq r (vl-catch-all-apply 'vlax-invoke-method (list ks:book 'Close :vlax-false)))
-      (if (vl-catch-all-error-p r) (princ "\n警告：Excelブックの終了処理に失敗しました。"))))
-  (foreach o ks:objects (ks:release o))
+      (if (vl-catch-all-error-p r) (princ "\n警告：Excelブックの終了処理に失敗しました。"))
+      (ks:release ks:book)))
   (setq ks:objects nil ks:book nil)
   (if ks:excel
     (progn
+      (ks:progress "専用Excelを終了")
       (setq r (vl-catch-all-apply 'vlax-invoke-method (list ks:excel 'Quit)))
       (if (vl-catch-all-error-p r) (princ "\n警告：専用Excelの終了処理に失敗しました。"))
       (ks:release ks:excel)))
@@ -192,6 +203,39 @@
           (T (setq done T))))))
   obj)
 
+(defun ks:batch-eligible-p (block name / actual layer definition)
+  (setq actual (if (vlax-property-available-p block 'EffectiveName)
+    (vla-get-EffectiveName block) (vla-get-Name block))
+    layer (tblsearch "LAYER" (vla-get-Layer block))
+    definition (tblsearch "BLOCK" (vla-get-Name block)))
+  (and (= (strcase actual) (strcase name))
+    (/= (vla-get-ObjectName block) "AcDbMInsertBlock")
+    (= (logand 4 (cdr (assoc 70 layer))) 0)
+    (= (logand 12 (cdr (assoc 70 definition))) 0)
+    (= (vla-get-HasAttributes block) :vlax-true)))
+(defun ks:filter-blocks (selection name / i block result eligible skipped)
+  (setq i 0 skipped 0)
+  (repeat (sslength selection)
+    (setq block (vlax-ename->vla-object (ssname selection i))
+      eligible (vl-catch-all-apply 'ks:batch-eligible-p (list block name)))
+    (if (and (not (vl-catch-all-error-p eligible)) eligible)
+      (setq result (cons block result))
+      (progn (ks:release block) (setq skipped (1+ skipped))))
+    (setq i (1+ i)))
+  (if (> skipped 0)
+    (princ (strcat "\n対象外のブロックを除外：" (itoa skipped) "（別カテゴリ・画層ロック・外部参照・属性なし等）")))
+  (reverse result))
+(defun ks:select-blocks (name / selection blocks done)
+  (while (not done)
+    (princ (strcat "\n機器ブロック（" name "）を選択してください。複数クリック・範囲選択可、Enterで確定："))
+    (setq selection (ssget '((0 . "INSERT"))))
+    (if selection
+      (progn
+        (setq blocks (ks:filter-blocks selection name))
+        (if blocks (setq done T)
+          (princ "\n対象カテゴリの編集可能な属性付きブロックを選択してください。")))
+      (setq done T)))
+  blocks)
 (defun ks:get-attributes (block / result)
   (ks:trace "GET ATTRIBUTES BEGIN")
   ;; Normalize the explicit ActiveX return value before foreach / cleanup.
@@ -308,18 +352,20 @@
   (if (ks:remote-p path) (setq path (ks:download-master path)))
   (ks:trace "DOWNLOAD/LOCAL PATH READY")
   (if (not (findfile path)) (ks:fail (strcat "Excelファイルが存在しません：" path)))
-  (ks:trace "EXCEL CREATE BEGIN")
+  (ks:progress "マスター用Excel起動") (ks:trace "EXCEL CREATE BEGIN")
   (setq result (vl-catch-all-apply 'vlax-create-object (list "Excel.Application")))
   (ks:trace "EXCEL CREATE END")
   (if (vl-catch-all-error-p result)
     (ks:fail (strcat "Excelを起動できません：" (vl-catch-all-error-message result))))
   (setq ks:excel result)
+  (ks:progress "マスター用Excel設定")
   (vlax-put-property ks:excel 'Visible :vlax-false)
   (vlax-put-property ks:excel 'DisplayAlerts :vlax-false)
   (vlax-put-property ks:excel 'EnableEvents :vlax-false)
+  (vlax-put-property ks:excel 'ScreenUpdating :vlax-false)
   (vlax-put-property ks:excel 'AutomationSecurity 3)
   (setq books (ks:track (vlax-get-property ks:excel 'Workbooks)))
-  (ks:trace "WORKBOOK OPEN BEGIN")
+  (ks:progress "マスターを読み取り専用で開く") (ks:trace "WORKBOOK OPEN BEGIN")
   ;; UpdateLinks=0, ReadOnly=True; opened files use their last saved contents.
   (setq result (vl-catch-all-apply 'vlax-invoke-method
     (list books 'Open path 0 :vlax-true 5 "" "" :vlax-true 2 "" :vlax-false :vlax-false)))
@@ -327,6 +373,7 @@
   (if (vl-catch-all-error-p result)
     (ks:fail (strcat "機器マスターを開けません：" path "\n" (vl-catch-all-error-message result))))
   (setq ks:book (ks:track result))
+  (ks:progress (strcat "マスター読取：" sheet))
   (setq ks:date1904 (= (vlax-get-property ks:book 'Date1904) :vlax-true))
   (setq sheets (ks:track (vlax-get-property ks:book 'Worksheets)))
   (ks:trace (strcat "SHEET BEGIN / " sheet))
@@ -511,10 +558,18 @@
   (setq system (ks:trim (ks:attribute-value attrs "SYSTEM"))
         num (ks:trim (ks:attribute-value attrs "NUM")))
   (if (and (/= system "") (/= num "")) (strcat system "-" num) ""))
+(defun ks:update-batches (batches data / batch count index)
+  (setq count 0 index 0)
+  (foreach batch batches
+    (setq index (1+ index) ks:stage (strcat "属性の書き込み " (itoa index) "/" (itoa (length batches))))
+    (ks:trace ks:stage)
+    (setq count (+ count (ks:update (cadr batch) data)))
+    (vla-Update (car batch)))
+  count)
 
 (defun c:KIKISET (/ *error* ks:reason ks:stage ks:objects ks:excel ks:book ks:changes
                      ks:category-id ks:sheet-alias ks:selection-steps ks:visibility ks:download-file
-                     profile block attrs path data records record doc undo count a pair result)
+                     profile block blocks batch batches blockAttrs attrs path data records record doc undo count a pair result)
   (defun *error* (msg / pair r)
     (ks:trace (strcat "ERROR / " (if ks:stage ks:stage "START") " / " (if ks:reason ks:reason (if msg msg "UNKNOWN"))))
     ;; Report first: a secondary cleanup failure must not hide the cause.
@@ -534,7 +589,7 @@
     (ks:close-excel)
     (if undo (vl-catch-all-apply 'vla-EndUndoMark (list doc)))
     (foreach a attrs (ks:release a))
-    (ks:release block) (ks:release doc)
+    (foreach block blocks (ks:release block)) (ks:release doc)
     (princ))
   ;; 選択順はカテゴリごとに設定し、コマンド外の設定へ影響させない。
   (ks:trace "START / CATEGORY WAIT")
@@ -544,11 +599,17 @@
         ks:selection-steps (if (= ks:category-id "KANKI") ks:vent-steps ks:aircon-steps)
         ks:stage "ブロック選択")
   (ks:trace (strcat "CATEGORY=" ks:category-id " / BLOCK SELECTION WAIT"))
-  (if (setq block (ks:select-block (cadr profile)))
+  (if (setq blocks (ks:select-blocks (cadr profile)))
     (progn
-      (setq ks:stage "属性の取得" attrs (ks:get-attributes block))
-      (if (null attrs) (ks:fail "編集可能な属性がありません。定数属性は対象外です。"))
-      (princ (strcat "\nブロックを取得しました。編集可能な属性数：" (itoa (length attrs))))
+      (setq ks:stage "属性の取得")
+      (foreach block blocks
+        (setq blockAttrs (ks:get-attributes block) attrs (append attrs blockAttrs))
+        (if blockAttrs
+          (setq batches (cons (list block blockAttrs) batches))
+          (princ "\n編集可能な属性がないブロックを除外しました。定数属性は対象外です。")))
+      (setq batches (reverse batches))
+      (if (null batches) (ks:fail "編集可能な属性がありません。定数属性は対象外です。"))
+      (princ (strcat "\n対象ブロック数：" (itoa (length batches)) " / 編集可能な属性数：" (itoa (length attrs))))
       (setq ks:stage "ローカル機器マスターの確認")
       (if (setq path (ks:file))
         (progn
@@ -569,20 +630,20 @@
           ;; 全属性の非表示フラグを保存。未更新の属性も含め、元の設定を保つ。
           (setq ks:visibility (mapcar '(lambda (a) (cons a (vla-get-Invisible a))) attrs))
           (vla-StartUndoMark doc) (setq undo T)
-          (setq count (ks:update attrs data))
-          (vla-Update block)
+          (setq count (ks:update-batches batches data))
           (ks:restore-visibility ks:visibility)
           (vla-Regen doc 1)
           (vla-EndUndoMark doc) (setq undo nil ks:changes nil)
-          (princ (strcat "\n機器情報を更新しました。\n機器番号：" (ks:equipment-number attrs)
-                         "\n型番：" (ks:attribute-value attrs "MODEL")
+          (princ (strcat "\n機器情報を更新しました。\n対象ブロック数：" (itoa (length batches))
+                         (if (= (length batches) 1) (strcat "\n機器番号：" (ks:equipment-number (cadar batches))) "")
+                         "\n型番：" (ks:record-value record "MODEL")
                          "\n更新項目数：" (itoa count))))
         (princ "\nキャンセルしました。")))
     (princ "\nキャンセルしました。"))
   (ks:close-excel)
   (foreach a attrs (ks:release a))
-  (ks:release block) (ks:release doc)
+  (foreach block blocks (ks:release block)) (ks:release doc)
   (princ))
 
-(princ "\nKIKISET loaded. Command: KIKISET")
+(princ (strcat "\nKIKISET loaded. Version: " ks:version " / Command: KIKISET"))
 (princ)

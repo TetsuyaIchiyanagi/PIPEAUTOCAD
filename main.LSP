@@ -216,6 +216,7 @@
     (load (strcat pa-path "06_kikiset.lsp"))
     (load (strcat pa-path "07_kikitable.lsp"))
     (load (strcat pa-path "08_garari_table.lsp"))
+    (load (strcat pa-path "xxplode.lsp"))
 
     (princ "\nPipeAutoCAD loaded.")
     (princ (strcat "\nPipeAutoCAD path: " pa-path))
@@ -229,6 +230,7 @@
     (princ "\nCommand: KIKISET")
     (princ "\nCommand: KIKITABLE")
     (princ "\nCommand: GARARITABLE")
+    (princ "\nCommand: XXPLODE / MAIN")
   )
   (progn
     (princ "\nPipeAutoCAD error: PipeAutoCAD folder was not found.")
@@ -239,3 +241,21 @@
     (princ "\nExpected location: OneDrive*/*Project*/02_CAD/02_Auto_Cad/08_CAD*/PIPEAUTOCAD")
   )
 )
+
+;; 既存main.LSPはローダーのみのため、各コマンドを呼ぶメニューを追加。
+(defun c:MAIN (/ choice commands)
+  (setq commands '(c:PIPESIZEAUTO c:INSERTPIPEPARTS c:CHECKPIPESEG c:CHECKNODESIZE
+                   c:DUCTDOUBLE c:MEPCROSSCUT c:DETAILCUT c:KIKISET c:KIKITABLE
+                   c:GARARITABLE c:XXPLODE))
+  (princ "\nPipeAutoCAD 機能一覧")
+  (princ "\n 1: PIPESIZEAUTO   2: INSERTPIPEPARTS   3: CHECKPIPESEG")
+  (princ "\n 4: CHECKNODESIZE  5: DUCTDOUBLE        6: MEPCROSSCUT")
+  (princ "\n 7: DETAILCUT      8: KIKISET           9: KIKITABLE")
+  (princ "\n10: GARARITABLE   11: XXPLODE（完全分解）")
+  (initget 6)
+  (setq choice (getint "\n機能番号を入力 <終了>："))
+  (if choice
+    (if (and pa-path (<= choice (length commands)))
+      (apply (nth (1- choice) commands) nil)
+      (princ "\n機能番号またはモジュールのロード状態を確認してください。")))
+  (princ))

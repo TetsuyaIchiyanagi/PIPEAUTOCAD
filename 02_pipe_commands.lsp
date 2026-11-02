@@ -157,7 +157,7 @@
 
         (if ang
           (progn
-            (pa-insert-block p "z01051016B" ang 100.0)
+            (pa-insert-block p "z01051016B" ang 100.0 lineSs)
             (entdel e)
             (princ "\n[DBG 01to16] replaced")
           )
@@ -321,12 +321,13 @@
   matched
 )
 
-(defun pa-cut-line-segment (a b)
+(defun pa-cut-line-segment (a b layer)
 
   (if (> (distance a b) 1.0)
     (entmakex
       (list
         '(0 . "LINE")
+        (cons 8 layer)
         (cons 10 a)
         (cons 11 b)
       )
@@ -395,7 +396,7 @@
                             q
                           )
                         )
-                        (pa-cut-line-segment p1 cut1)
+                        (pa-cut-line-segment p1 cut1 (cdr (assoc 8 ed)))
                       )
                     )
 
@@ -408,7 +409,7 @@
                             q
                           )
                         )
-                        (pa-cut-line-segment cut2 p2)
+                        (pa-cut-line-segment cut2 p2 (cdr (assoc 8 ed)))
                       )
                     )
                   )
@@ -422,7 +423,7 @@
                   (progn
                     (entdel e)
                     (setq cut2 (polar p (angle p p2) gap))
-                    (pa-cut-line-segment cut2 p2)
+                    (pa-cut-line-segment cut2 p2 (cdr (assoc 8 ed)))
                   )
                 )
               )
@@ -433,7 +434,7 @@
                   (progn
                     (entdel e)
                     (setq cut1 (polar p (angle p p1) gap))
-                    (pa-cut-line-segment p1 cut1)
+                    (pa-cut-line-segment p1 cut1 (cdr (assoc 8 ed)))
                   )
                 )
               )
@@ -497,7 +498,23 @@
   )
 )
 
-(defun pa-insert-block (p blkName angleDeg dia / angleRad scale ent dirs cutDirs gap)
+;; Use the first selected line touching the insertion point, including layer 0.
+(defun pa-line-layer-at-point (ss p tol / i ed layer)
+  (setq i 0)
+  (while (and ss (not layer) (< i (sslength ss)))
+    (setq ed (entget (ssname ss i)))
+    (if (and (= (cdr (assoc 0 ed)) "LINE")
+             (or (< (distance p (cdr (assoc 10 ed))) tol)
+                 (< (distance p (cdr (assoc 11 ed))) tol)
+                 (pa-point-on-seg2 p (cdr (assoc 10 ed)) (cdr (assoc 11 ed)) tol)))
+      (setq layer (cdr (assoc 8 ed)))
+    )
+    (setq i (1+ i))
+  )
+  layer
+)
+
+(defun pa-insert-block (p blkName angleDeg dia sourceLineSs / angleRad scale ent dirs cutDirs gap layer)
 
   (setq angleRad (* pi (/ angleDeg 180.0)))
   (if (or (null dia) (<= dia 0.0))
@@ -505,6 +522,7 @@
   )
   (setq scale (* (pa-get-block-scale) (/ dia 100.0)))
   (setq dirs pa-current-insert-dirs)
+  (setq layer (pa-line-layer-at-point sourceLineSs p 10.0))
   (setq cutDirs (pa-get-cut-dirs blkName dirs))
   (setq gap
     (cond
@@ -520,6 +538,7 @@
         (entmakex
           (list
             '(0 . "INSERT")
+            (cons 8 (if layer layer (getvar "CLAYER")))
             (cons 2 blkName)
             (cons 10 p)
             (cons 41 scale)
@@ -855,7 +874,7 @@
                     (setq pa-current-insert-dirs dirs)
                     (if (= blk "__FILLET__")
                       (pa-fillet-lines-at-node lineSs p (getvar "LTSCALE"))
-                      (pa-insert-block p blk ang 100.0)
+                      (pa-insert-block p blk ang 100.0 lineSs)
                     )
                     (setq pa-current-insert-dirs nil)
                     (setq count (1+ count))

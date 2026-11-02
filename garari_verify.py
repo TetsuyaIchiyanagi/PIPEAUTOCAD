@@ -54,6 +54,8 @@ for name, keys in (
     populated = [h for h in headers if h]
     assert len(populated) == len(set(populated)), f'{name}: duplicate header'
     required = set(keys) | {'MODEL', 'MANUFACTURER', 'DIA', 'SPEC_NOTE', 'APPROVED', 'SOURCE_URL', 'CHECKED_DATE'}
+    if name == 'ROOM_MASTER':
+        required.add('AUTO_SELECT')
     assert required <= set(headers), f'{name}: missing required headers'
     rows = [dict(zip(headers, map(cell_text, values))) for values in sheet.iter_rows(min_row=3, values_only=True)]
     rows = [row for row in rows if row['MODEL']]
@@ -64,6 +66,8 @@ for name, keys in (
         assert key not in seen, f'{name}: duplicate key {key}'
         seen.add(key)
         assert row['APPROVED'] in ('0', '1')
+        if name == 'ROOM_MASTER':
+            assert row['AUTO_SELECT'] in ('0', '1')
         assert row['MODEL'] and row['DIA'].isdigit() and int(row['DIA']) > 0
         assert not any('\n' in v or '\r' in v for v in row.values())
         if name == 'GARARI_MASTER':
@@ -73,4 +77,8 @@ for name, keys in (
             assert (row['FD_TEMP'].isdigit() if row['FD'] == 'あり' else row['FD_TEMP'] == '')
             assert (row['MESH_SPEC'].isdigit() if row['MESH'] == 'あり' else row['MESH_SPEC'] == '')
     print(f'{name}: {len(rows)} unique valid workbook rows')
+    if name == 'ROOM_MASTER':
+        defaults = [row['DIA'] for row in rows if row['MANUFACTURER'] == '三菱電機'
+                    and row['APPROVED'] == row['AUTO_SELECT'] == '1']
+        assert len(defaults) == len(set(defaults)), 'ROOM_MASTER: conflicting automatic defaults'
 book.close()

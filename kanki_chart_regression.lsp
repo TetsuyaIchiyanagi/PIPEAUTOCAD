@@ -1,0 +1,17 @@
+;; Focused COM check of intentional chart gaps versus genuinely broken formulas.
+(defun *error* (msg) (princ (strcat "\nREGRESSION_ERROR: " msg)) (kt:cleanup) (princ))
+(kt:open kr:fixture)
+(setq kr:sheets (kt:own (vlax-get-property kt:book 'Worksheets))
+  kr:chart (kt:own (vlax-invoke-method kr:sheets 'Add)) kr:cell (kt:range kr:chart 1 1 1 1))
+(vlax-put-property kr:cell 'Formula "=IF(B1=\"\",NA(),B1)") (kt:drop kr:cell)
+(vlax-invoke-method kt:excel 'CalculateFull)
+(princ (strcat "\nCHART_NA_RESULT=" (vl-princ-to-string
+  (kc:chart-na (list (vlax-get-property kr:chart 'Name) 1 1 "#N/A")))))
+(if (not (kc:chart-na (list (vlax-get-property kr:chart 'Name) 1 1 "#N/A")))
+  (progn (princ "\nFAIL: intentional-chart-na-COM") (exit)))
+(setq kr:cell (kt:range kr:chart 1 1 1 1))
+(vlax-put-property kr:cell 'Formula "=NA()") (kt:drop kr:cell)
+(if (kc:chart-na (list (vlax-get-property kr:chart 'Name) 1 1 "#N/A"))
+  (progn (princ "\nFAIL: unexpected-na-COM") (exit)))
+(kt:cleanup)
+(princ "\nKANKI_CHART_PASS=2") (princ)

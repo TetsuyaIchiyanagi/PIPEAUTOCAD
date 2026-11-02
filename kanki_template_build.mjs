@@ -1,0 +1,41 @@
+import fs from 'node:fs/promises';
+import {Workbook, SpreadsheetFile, FileBlob} from '@oai/artifact-tool';
+const root = process.argv[2];
+const reference = process.argv[3];
+const wb = Workbook.create();
+const s = wb.worksheets.add('換気計算(一般）');
+s.showGridLines = false;
+s.getRange('C2').values = [['換気計算書']];
+s.getRange('C2').format.font = {name:'Yu Gothic',size:14,bold:true};
+const headings = ['階','室名','床面積','天井高さ','容積','人員','占有面積','人員による換気量',null,'シックハウス/法２８条\n換気計算',null,'換気回数法',null,'決定\n換気量','換気方式','採用機器の換気能力',null,'判定','機器番号','送風機\n形式'];
+s.getRange('C3:V3').values = [headings];
+for(const m of ['C3:C5','D3:D5','E3:E4','F3:F4','G3:G4','H3:H4','I3:I4','J3:K3','L3:M4','N3:O3','P3:P4','Q3:Q4','R3:S3','T3:T5','U3:U5','V3:V5']) s.mergeCells(m);
+for(const [a,v] of Object.entries({'J4':'一人当たり','K4':'換気量','N4':'回数','O4':'換気量','R4':'風量','S4':'静圧'})) s.getRange(a).values=[[v]];
+s.getRange('E5:S5').values=[['㎡','m','㎥','人','㎡/人','m3/h・人','m3/h','回/h','m3/h','回/h','m3/h','m3/h','1/2/3種','m3/h','Pa']];
+s.getRange('C3:V25').format.font={name:'Yu Gothic',size:10};
+s.getRange('C3:V5').format.fill='#E8EDF2';
+s.getRange('C3:V5').format.font={name:'Yu Gothic',size:10,bold:true};
+s.getRange('C3:V5').format.wrapText=true;
+s.getRange('C3:V25').format.verticalAlignment='center';
+s.getRange('C3:V5').format.horizontalAlignment='center';
+s.getRange('C3:V25').format.borders={preset:'all',style:'thin',color:'#A4ABB4'};
+s.getRange('C3:V25').format.columnWidth=12;
+s.getRange('D3:D25').format.columnWidth=28;
+s.getRange('U3:U25').format.columnWidth=24;
+s.getRange('V3:V25').format.columnWidth=48;
+s.getRange('C3:C25').format.columnWidth=7;
+s.getRange('C3:V5').format.rowHeight=30;
+s.getRange('C6:V25').format.rowHeight=30;
+s.getRange('E6:S25').setNumberFormat('0.##');
+for(const c of ['H','I','J','L','N','Q']) {s.getRange(`${c}6:${c}25`).format.fill='#FFF2CC';s.getRange(`${c}6:${c}25`).format.font.color='#1F4E79';}
+s.freezePanes.freezeRows(5);
+wb.recalculate();
+await (await SpreadsheetFile.exportXlsx(wb)).save(`${root}/換気計算テンプレート.xlsx`);
+const png = await wb.render({sheetName:s.name,range:'C2:V8',scale:1.3,format:'png'});
+await fs.writeFile(`${root}/template-preview.png`,new Uint8Array(await png.arrayBuffer()));
+console.log((await wb.inspect({kind:'region',sheetId:s.name,range:'C3:V6',maxChars:1500})).ndjson);
+if(reference){
+ const ref=await SpreadsheetFile.importXlsx(await FileBlob.load(reference));
+ const img=await ref.render({sheetName:s.name,range:'C2:V9',scale:1,format:'png'});
+ await fs.writeFile(`${root}/reference-preview.png`,new Uint8Array(await img.arrayBuffer()));
+}

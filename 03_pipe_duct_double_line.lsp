@@ -857,7 +857,7 @@
             (setq pa-current-insert-dirs dirs)
             (if (= blk "__FILLET__")
               (pa-fillet-lines-at-node lineSs p (* (getvar "LTSCALE") (/ dia 100.0)))
-              (pa-insert-block p blk ang dia)
+              (pa-insert-block p blk ang dia lineSs)
             )
             (setq pa-current-insert-dirs nil)
             (setq count (1+ count))
@@ -1003,7 +1003,7 @@
                     (setq pa-current-insert-dirs dirs)
                     (if (= blk "__FILLET__")
                       (pa-fillet-lines-at-node lineSs p (* (getvar "LTSCALE") (/ dia 100.0)))
-                      (pa-insert-block p blk ang dia)
+                      (pa-insert-block p blk ang dia lineSs)
                     )
                     (setq pa-current-insert-dirs nil)
                     (setq count (1+ count))
@@ -1716,14 +1716,14 @@
 )
 
 (defun pa-duct-valid-dia-p (dia)
-  (member dia '(100 150 200 300 400))
+  (member dia '(100 150 200 250 300 400))
 )
 
 (defun pa-duct-read-dia (/ dia done)
   (setq done nil)
 
   (while (not done)
-    (setq dia (getint "\nDuct diameter [100/150/200/300/400] <200>: "))
+    (setq dia (getint "\nDuct diameter [100/150/200/250/300/400] <200>: "))
 
     (cond
       ((null dia)
@@ -1734,7 +1734,7 @@
         (setq done T)
       )
       (T
-        (princ "\nEnter 100, 150, 200, 300, or 400.")
+        (princ "\nEnter 100, 150, 200, 250, 300, or 400.")
       )
     )
   )
@@ -1904,9 +1904,10 @@
   )
 )
 
-(defun pa-duct-insert-block (p blkName angleDeg dia / angleRad scale ent)
+(defun pa-duct-insert-block (p blkName angleDeg dia sourceLineSs / angleRad scale ent layer)
   (setq angleRad (* pi (/ (pa-duct-insert-angle blkName angleDeg) 180.0)))
   (setq scale (pa-duct-scale-from-dia dia))
+  (setq layer (pa-line-layer-at-point sourceLineSs p (pa-duct-node-tol)))
 
   (if (tblsearch "BLOCK" blkName)
     (progn
@@ -1914,6 +1915,7 @@
         (entmakex
           (list
             '(0 . "INSERT")
+            (cons 8 (if layer layer (getvar "CLAYER")))
             (cons 2 blkName)
             (cons 10 p)
             (cons 41 scale)
@@ -1956,7 +1958,7 @@
   )
 )
 
-(defun pa-duct-insert-node-block (p info dia / blk ang ent extents)
+(defun pa-duct-insert-node-block (p info dia sourceLineSs / blk ang ent extents)
   (if info
     (progn
       (setq blk (car info))
@@ -1964,7 +1966,7 @@
 
       (if (member blk '("z03103001B" "z03104001B"))
         (progn
-          (setq ent (pa-duct-insert-block p blk ang dia))
+          (setq ent (pa-duct-insert-block p blk ang dia sourceLineSs))
           (if ent
             (progn
               (setq extents (pa-duct-block-extents ent p))
@@ -1992,7 +1994,7 @@
     (setq info (pa-duct-dirs-to-block dirs))
     (setq nodeCount (1+ nodeCount))
 
-    (setq node (pa-duct-insert-node-block p info dia))
+    (setq node (pa-duct-insert-node-block p info dia lineSs))
     (if node
       (progn
         (setq inserted (cons node inserted))
